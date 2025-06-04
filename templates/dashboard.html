@@ -19,33 +19,25 @@
     </div>
 </div>
 
-<!-- System Statistics Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="card-title text-white">Total Clients</h5>
-                        <h2 class="text-white mb-0" data-stat="clients">{{ system_stats.total_clients or 0 }}</h2>
-                    </div>
-                    <i class="fas fa-users fa-2x text-white opacity-75"></i>
-                </div>
-            </div>
+<!-- System Statistics Cards with New Theme Support -->
+<div class="stats-grid">
+    <div class="stat-card stat-clients">
+        <div class="stat-info">
+            <div class="stat-label">Total Clients</div>
+            <div class="stat-value" data-stat="clients">{{ system_stats.total_clients or 0 }}</div>
+        </div>
+        <div class="stat-icon">
+            <i class="fas fa-users fa-2x"></i>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card bg-success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="card-title text-white">Total Sessions</h5>
-                        <h2 class="text-white mb-0" data-stat="transcripts">{{ system_stats.total_transcripts or 0 }}</h2>
-                    </div>
-                    <i class="fas fa-file-alt fa-2x text-white opacity-75"></i>
-                </div>
-            </div>
+    <div class="stat-card stat-sessions">
+        <div class="stat-info">
+            <div class="stat-label">Total Sessions</div>
+            <div class="stat-value" data-stat="transcripts">{{ system_stats.total_transcripts or 0 }}</div>
+        </div>
+        <div class="stat-icon">
+            <i class="fas fa-file-alt fa-2x"></i>
         </div>
     </div>
 

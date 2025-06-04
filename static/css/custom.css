@@ -1,25 +1,150 @@
-/* Custom CSS for Therapy Transcript Processor */
+/* 
+ * UI Component Improvements for Therapy Transcript Processor
+ * Enhanced theming system with comprehensive dark/light theme support
+ */
 
-/* Healthcare-themed color variables */
+/**
+ * CSS Variables for Theming
+ * These variables define the color scheme for both light and dark themes.
+ */
 :root {
-    --healthcare-primary: hsl(210, 100%, 50%);
-    --healthcare-success: hsl(142, 71%, 45%);
-    --healthcare-warning: hsl(45, 100%, 51%);
-    --healthcare-danger: hsl(354, 70%, 54%);
-    --healthcare-info: hsl(188, 78%, 41%);
-    --healthcare-light: hsl(210, 17%, 95%);
-    --healthcare-dark: hsl(210, 11%, 15%);
+  /* Common colors across themes */
+  --primary-color: #4a6cf7;
+  --primary-hover: #3a5ce5;
+  --secondary-color: #6c757d;
+  --success-color: #28a745;
+  --warning-color: #ffc107;
+  --danger-color: #dc3545;
+  --info-color: #17a2b8;
+  
+  /* Light theme (default) */
+  --background-color: #f8f9fa;
+  --surface-color: #ffffff;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --border-color: #dee2e6;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --background-hover: rgba(0, 0, 0, 0.05);
+  
+  /* Component-specific variables */
+  --card-background: var(--surface-color);
+  --header-background: var(--surface-color);
+  --table-header-background: #f1f3f5;
+  --table-row-hover: #f8f9fa;
+  --table-border: #e9ecef;
+  
+  /* Status card colors - light theme */
+  --clients-card-bg: #e9d8fd;
+  --clients-card-text: #553c9a;
+  --sessions-card-bg: #c6f6d5;
+  --sessions-card-text: #276749;
+  --pending-card-bg: #feebc8;
+  --pending-card-text: #975a16;
+  --failed-card-bg: #fed7d7;
+  --failed-card-text: #9b2c2c;
+  
+  /* Status indicators */
+  --status-operational: #38a169;
+  --status-warning: #dd6b20;
+  --status-error: #e53e3e;
+  
+  /* Healthcare compatibility */
+  --healthcare-primary: var(--primary-color);
+  --healthcare-success: var(--success-color);
+  --healthcare-warning: var(--warning-color);
+  --healthcare-danger: var(--danger-color);
+  --healthcare-info: var(--info-color);
+  --healthcare-light: var(--background-color);
+  --healthcare-dark: var(--text-primary);
 }
 
-/* Override Bootstrap variables for better healthcare theme consistency */
+/* Dark theme */
+[data-theme="dark"] {
+  --background-color: #121212;
+  --surface-color: #1e1e1e;
+  --text-primary: #f8f9fa;
+  --text-secondary: #adb5bd;
+  --border-color: #343a40;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --background-hover: rgba(255, 255, 255, 0.1);
+  
+  /* Component-specific variables */
+  --card-background: #2d2d2d;
+  --header-background: #252525;
+  --table-header-background: #2d2d2d;
+  --table-row-hover: #3d3d3d;
+  --table-border: #444;
+  
+  /* Status card colors - dark theme */
+  --clients-card-bg: #44337a;
+  --clients-card-text: #d6bcfa;
+  --sessions-card-bg: #1c4532;
+  --sessions-card-text: #9ae6b4;
+  --pending-card-bg: #744210;
+  --pending-card-text: #fbd38d;
+  --failed-card-bg: #742a2a;
+  --failed-card-text: #feb2b2;
+  
+  /* Status indicators */
+  --status-operational: #48bb78;
+  --status-warning: #ed8936;
+  --status-error: #f56565;
+  
+  /* Healthcare compatibility */
+  --healthcare-light: var(--background-color);
+  --healthcare-dark: var(--text-primary);
+}
+
+/* Global styles */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+  margin: 0 8px;
+  color: var(--text-primary);
+}
+
+.theme-toggle:hover {
+  background-color: var(--background-hover);
+  transform: scale(1.05);
+}
+
+.theme-toggle:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.theme-toggle-icon {
+  font-size: 1.2rem;
+}
+
+/* Override Bootstrap variables for better theme consistency */
 .btn-primary {
-    background-color: var(--healthcare-primary);
-    border-color: var(--healthcare-primary);
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 .btn-primary:hover {
-    background-color: hsl(210, 100%, 45%);
-    border-color: hsl(210, 100%, 45%);
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
 }
 
 /* Custom card styling for analytics */
@@ -33,15 +158,69 @@
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 
-/* Custom stat cards */
+/* Improved stats cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 .stat-card {
-    background: linear-gradient(135deg, var(--bs-gray-800) 0%, var(--bs-gray-900) 100%);
-    border: 1px solid var(--bs-gray-700);
-    transition: transform 0.2s ease-in-out;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px var(--shadow-color);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
 }
 
 .stat-card:hover {
-    transform: translateY(-2px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px var(--shadow-color);
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+/* Specific stat card styles using CSS variables */
+.stat-clients {
+  background-color: var(--clients-card-bg);
+  color: var(--clients-card-text);
+}
+
+.stat-sessions {
+  background-color: var(--sessions-card-bg);
+  color: var(--sessions-card-text);
+}
+
+.stat-pending {
+  background-color: var(--pending-card-bg);
+  color: var(--pending-card-text);
+}
+
+.stat-failed {
+  background-color: var(--failed-card-bg);
+  color: var(--failed-card-text);
 }
 
 .stat-number {
@@ -81,15 +260,36 @@
     opacity: 0.7;
 }
 
-/* Metric cards for progress tracking */
-.metric-card {
-    background: var(--bs-gray-800);
-    border-color: var(--bs-gray-700);
-    transition: border-color 0.15s ease-in-out;
+/* Cards and surfaces using theme variables */
+.card, .metric-card {
+    background-color: var(--card-background);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease-in-out, background-color 0.3s ease;
 }
 
-.metric-card:hover {
-    border-color: var(--healthcare-primary);
+.card:hover, .metric-card:hover {
+    border-color: var(--primary-color);
+}
+
+/* Tables with theme support */
+.table {
+    color: var(--text-primary);
+    background-color: var(--card-background);
+}
+
+.table thead th {
+    background-color: var(--table-header-background);
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--table-border);
+}
+
+.table tbody tr:hover {
+    background-color: var(--table-row-hover);
+}
+
+.table td, .table th {
+    border-top: 1px solid var(--table-border);
 }
 
 .metric-title {
