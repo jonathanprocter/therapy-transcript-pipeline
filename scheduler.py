@@ -188,14 +188,51 @@ def process_single_file(file_info, dropbox_service, document_processor, ai_servi
         db.session.add(transcript)
         db.session.flush()  # Get the ID
         
-        # Perform AI analysis
-        logger.info(f"Starting AI analysis for transcript {transcript.id}")
-        analysis_results = ai_service.analyze_transcript(
-            processed_data['cleaned_content'],
-            client_name
-        )
+        # Perform comprehensive therapy analysis using the clinical prompt
+        logger.info(f"Starting comprehensive therapy analysis for transcript {transcript.id}")
         
-        # Update transcript with analysis results
+        # Use the comprehensive therapy analysis prompt for ALL PDFs
+        therapy_prompt = Config.THERAPY_ANALYSIS_PROMPT + processed_data['raw_content']
+        
+        # Generate comprehensive clinical progress note
+        import openai
+        openai_client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
+        
+        try:
+            response = openai_client.chat.completions.create(
+                model=Config.OPENAI_MODEL,
+                messages=[
+                    {
+                        'role': 'system',
+                        'content': 'You are an expert clinical therapist creating comprehensive progress notes with deep clinical analysis.'
+                    },
+                    {
+                        'role': 'user', 
+                        'content': therapy_prompt
+                    }
+                ],
+                max_tokens=4000,
+                temperature=0.7
+            )
+            
+            comprehensive_analysis = response.choices[0].message.content
+            logger.info(f"Generated comprehensive clinical analysis: {len(comprehensive_analysis)} characters")
+            
+            # Store the comprehensive analysis
+            analysis_results = {
+                'comprehensive_clinical_analysis': comprehensive_analysis,
+                'openai_analysis': comprehensive_analysis
+            }
+            
+        except Exception as e:
+            logger.error(f"Comprehensive therapy analysis failed: {e}")
+            # Fallback to standard analysis
+            analysis_results = ai_service.analyze_transcript(
+                processed_data['cleaned_content'],
+                client_name
+            )
+        
+        # Update transcript with comprehensive analysis results
         transcript.openai_analysis = analysis_results.get('openai_analysis')
         transcript.anthropic_analysis = analysis_results.get('anthropic_analysis')
         transcript.gemini_analysis = analysis_results.get('gemini_analysis')
