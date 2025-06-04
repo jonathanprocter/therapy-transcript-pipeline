@@ -58,6 +58,7 @@
                             <i class="fas fa-sync-alt me-1"></i>Manual Scan
                         </button>
                     </li>
+                    <!-- Theme switcher will be added here by JavaScript -->
                 </ul>
             </div>
         </div>
@@ -127,6 +128,7 @@
     
     <!-- Custom JavaScript -->
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
     
     <!-- Page-specific scripts -->
     {% block scripts %}{% endblock %}
