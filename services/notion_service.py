@@ -43,6 +43,129 @@ class NotionService:
             logger.error(f"Notion connection error: {str(e)}")
             return False
     
+    def create_progress_note(self, client_name: str, session_date: str, content: str, 
+                           rich_text_blocks: List[Dict] = None, emotional_data: Dict = None, 
+                           ai_analysis: Dict = None) -> Dict:
+        """Create a progress note page in Notion database"""
+        if not self.headers:
+            logger.error("Notion not configured")
+            return {"success": False, "error": "Notion not configured"}
+        
+        database_id = Config.NOTION_DATABASE_ID
+        if not database_id:
+            logger.error("Notion database ID not configured")
+            return {"success": False, "error": "Database ID not configured"}
+        
+        try:
+            # Create page properties
+            properties = {
+                "Client": {
+                    "title": [
+                        {
+                            "text": {
+                                "content": client_name
+                            }
+                        }
+                    ]
+                },
+                "Session Date": {
+                    "date": {
+                        "start": session_date
+                    }
+                },
+                "Status": {
+                    "select": {
+                        "name": "Completed"
+                    }
+                }
+            }
+            
+            # Add emotional analysis properties if available
+            if emotional_data:
+                primary_emotion = emotional_data.get('primary_emotion', 'neutral')
+                intensity = emotional_data.get('intensity', 0.5)
+                
+                properties["Primary Emotion"] = {
+                    "select": {
+                        "name": primary_emotion.title()
+                    }
+                }
+                
+                properties["Intensity"] = {
+                    "number": round(intensity, 2)
+                }
+            
+            # Create content blocks with proper text length limits
+            content_blocks = []
+            if rich_text_blocks:
+                # Process rich text blocks and ensure each text content is under 2000 chars
+                for block in rich_text_blocks:
+                    if block.get("type") == "paragraph" and block.get("paragraph", {}).get("rich_text"):
+                        for rich_text_item in block["paragraph"]["rich_text"]:
+                            if rich_text_item.get("text", {}).get("content"):
+                                text_content = rich_text_item["text"]["content"]
+                                if len(text_content) > 1900:  # Leave some buffer
+                                    rich_text_item["text"]["content"] = text_content[:1900] + "..."
+                    content_blocks.append(block)
+            else:
+                # Split long content into multiple paragraphs
+                text_chunks = []
+                remaining_content = content
+                while remaining_content:
+                    chunk = remaining_content[:1900]
+                    # Try to break at sentence boundary
+                    if len(remaining_content) > 1900:
+                        last_period = chunk.rfind('.')
+                        if last_period > 1000:  # Only break if we find a reasonable sentence break
+                            chunk = chunk[:last_period + 1]
+                    
+                    text_chunks.append(chunk)
+                    remaining_content = remaining_content[len(chunk):]
+                
+                # Create paragraph blocks for each chunk
+                for chunk in text_chunks:
+                    content_blocks.append({
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": chunk
+                                    }
+                                }
+                            ]
+                        }
+                    })
+
+            # Create the page
+            page_data = {
+                "parent": {"database_id": database_id},
+                "properties": properties,
+                "children": content_blocks
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/pages",
+                headers=self.headers,
+                json=page_data
+            )
+            
+            if response.status_code == 200:
+                page_id = response.json().get('id')
+                logger.info(f"Created Notion page for {client_name}: {page_id}")
+                return {"success": True, "page_id": page_id}
+            else:
+                error_msg = f"Failed to create page: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+                
+        except Exception as e:
+            error_msg = f"Error creating Notion page: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+
     def create_client_database(self, client_name: str) -> Optional[str]:
         """Create a new database for a client"""
         if not self.headers:
