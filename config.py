@@ -27,7 +27,7 @@ class Config:
     # AI Model configurations
     OPENAI_MODEL = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
     ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"  # the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
-    GEMINI_MODEL = "gemini-pro"
+    GEMINI_MODEL = "gemini-1.5-flash"
 
     # Analysis prompts
     THERAPY_ANALYSIS_PROMPT = """

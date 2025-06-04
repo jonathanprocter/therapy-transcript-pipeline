@@ -80,7 +80,7 @@ def process_single_gemini():
     import google.generativeai as genai
     
     genai.configure(api_key=Config.GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-pro')
+    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
     
     with app.app_context():
         from sqlalchemy import text
