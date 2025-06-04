@@ -37,8 +37,8 @@ except Exception as e:
 def dashboard():
     """Main dashboard showing overview of all clients and recent activity"""
     try:
-        # Get all clients with their transcript counts
-        clients = db.session.query(Client).all()
+        # Get all clients with their transcript counts - ordered alphabetically
+        clients = db.session.query(Client).order_by(Client.name.asc()).all()
 
         client_stats = []
         for client in clients:
@@ -790,8 +790,8 @@ def client_details(client_id):
             flash('Client not found', 'error')
             return redirect(url_for('dashboard'))
         
-        # Get all transcripts for this client
-        transcripts = db.session.query(Transcript).filter_by(client_id=client_id).order_by(Transcript.session_date.desc()).all()
+        # Get all transcripts for this client - ordered chronologically (newest first)
+        transcripts = db.session.query(Transcript).filter_by(client_id=client_id).order_by(Transcript.session_date.desc(), Transcript.created_at.desc()).all()
         
         # Calculate statistics
         total_sessions = len(transcripts)
