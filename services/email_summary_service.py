@@ -17,10 +17,18 @@ class EmailSummaryService:
     def extract_session_summary(self, transcript_data: Dict) -> Dict:
         """Extract key information from AI analyses to create session summary"""
         try:
-            # Combine all AI analyses
+            # Combine all AI analyses - handle both string and dict formats
             openai_analysis = transcript_data.get('openai_analysis', '')
+            if isinstance(openai_analysis, dict):
+                openai_analysis = str(openai_analysis)
+            
             anthropic_analysis = transcript_data.get('anthropic_analysis', '')
+            if isinstance(anthropic_analysis, dict):
+                anthropic_analysis = str(anthropic_analysis)
+                
             gemini_analysis = transcript_data.get('gemini_analysis', '')
+            if isinstance(gemini_analysis, dict):
+                gemini_analysis = str(gemini_analysis)
             
             # Extract key components using pattern matching
             summary_data = {
@@ -402,7 +410,7 @@ KEY TOPICS DISCUSSED
             sg = SendGridAPIClient(self.sendgrid_api_key)
             
             message = Mail(
-                from_email=Email("noreply@therapynotes.com", "Therapy Notes System"),
+                from_email=Email("therapynotes@replit.app", "Therapy Notes System"),
                 to_emails=To(recipient_email),
                 subject=email_content['subject']
             )
