@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Transcript - Therapy Transcript Processor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            background-color: #343a40;
+        }
+        .sidebar-sticky {
+            position: relative;
+            top: 0;
+            height: calc(100vh - 48px);
+            padding-top: .5rem;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        .nav-link {
+            color: #ced4da;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+        }
+        .nav-link:hover {
+            color: #fff;
+        }
+        .nav-link.active {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .nav-link i {
+            margin-right: 10px;
+        }
+        main {
+            padding-top: 30px;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #aaa;
+        }
+        .upload-icon {
+            font-size: 48px;
+            color: #6c757d;
+        }
+        #file-name {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .processing-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="sidebar-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{{ url_for('upload') }}">
+                                <i class="bi bi-cloud-upload"></i> Upload Transcript
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('settings') }}">
+                                <i class="bi bi-gear"></i> API Settings
+                            </a>
+                        </li>
+                        <li class="nav-item mt-5">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Upload Transcript</h1>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category if category != 'error' else 'danger' }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Upload PDF Transcript</h5>
+                                <p class="card-text">Select a PDF file containing a therapy transcript to process.</p>
+                                
+                                <form method="POST" enctype="multipart/form-data" id="upload-form">
+                                    <div class="upload-area" id="upload-area">
+                                        <i class="bi bi-cloud-arrow-up upload-icon"></i>
+                                        <h5>Drag & Drop or Click to Upload</h5>
+                                        <p class="text-muted">Supported format: PDF (Max 16MB)</p>
+                                        <div id="file-name"></div>
+                                        <input type="file" name="transcript" id="file-input" accept=".pdf" style="display: none;">
+                                    </div>
+                                    <div class="d-grid gap-2 mt-3">
+                                        <button type="submit" class="btn btn-primary" id="upload-button" disabled>
+                                            Process Transcript
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">API Status</h5>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                        OpenAI: 
+                                        {% if api_keys.openai_key %}
+                                            <span class="badge bg-success">Configured</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Not Configured</span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="list-group-item">
+                                        Claude: 
+                                        {% if api_keys.claude_key %}
+                                            <span class="badge bg-success">Configured</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Not Configured</span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="list-group-item">
+                                        Gemini: 
+                                        {% if api_keys.gemini_key %}
+                                            <span class="badge bg-success">Configured</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Not Configured</span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="list-group-item">
+                                        Notion: 
+                                        {% if api_keys.notion_key and api_keys.notion_parent_id %}
+                                            <span class="badge bg-success">Configured</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Not Configured</span>
+                                        {% endif %}
+                                    </li>
+                                </ul>
+                                {% if not (api_keys.openai_key or api_keys.claude_key or api_keys.gemini_key) or not (api_keys.notion_key and api_keys.notion_parent_id) %}
+                                    <div class="alert alert-warning mt-3">
+                                        <i class="bi bi-exclamation-triangle"></i> Please configure your API keys in the <a href="{{ url_for('settings') }}">Settings</a> page.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if last_processed %}
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card processing-result">
+                            <div class="card-body">
+                                <h5 class="card-title">Processing Result</h5>
+                                <div class="alert alert-success">
+                                    <i class="bi bi-check-circle"></i> Successfully processed transcript for <strong>{{ last_processed.client_name }}</strong>
+                                </div>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                        <strong>File:</strong> {{ last_processed.filename }}
+                                    </li>
+                                    <li class="list-group-item">
+                                        <strong>Processed at:</strong> {{ last_processed.timestamp }}
+                                    </li>
+                                    <li class="list-group-item">
+                                        <strong>AI Service:</strong> {{ last_processed.service_used }}
+                                    </li>
+                                    <li class="list-group-item">
+                                        <strong>Notion Page:</strong> 
+                                        <a href="{{ last_processed.notion_url }}" target="_blank">View in Notion</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const fileName = document.getElementById('file-name');
+            const uploadButton = document.getElementById('upload-button');
+            const uploadForm = document.getElementById('upload-form');
+
+            // Handle click on upload area
+            uploadArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+
+            // Handle drag and drop
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#007bff';
+            });
+
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.style.borderColor = '#ddd';
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#ddd';
+                
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    updateFileName();
+                }
+            });
+
+            // Handle file selection
+            fileInput.addEventListener('change', updateFileName);
+
+            function updateFileName() {
+                if (fileInput.files.length) {
+                    const file = fileInput.files[0];
+                    fileName.textContent = file.name;
+                    
+                    // Check if file is PDF
+                    if (file.type === 'application/pdf') {
+                        uploadButton.disabled = false;
+                    } else {
+                        uploadButton.disabled = true;
+                        alert('Please select a PDF file.');
+                        fileName.textContent = '';
+                    }
+                } else {
+                    fileName.textContent = '';
+                    uploadButton.disabled = true;
+                }
+            }
+
+            // Handle form submission
+            uploadForm.addEventListener('submit', function(e) {
+                if (uploadButton.disabled) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                uploadButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+                uploadButton.disabled = true;
+            });
+        });
+    </script>
+</body>
+</html>

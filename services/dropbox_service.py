@@ -1,0 +1,170 @@
+import os
+import logging
+import dropbox
+from typing import List, Dict, Optional
+from datetime import datetime, timezone
+from config import Config
+
+logger = logging.getLogger(__name__)
+
+class DropboxService:
+    """Service for interacting with Dropbox API"""
+    
+    def __init__(self):
+        self.access_token = Config.DROPBOX_ACCESS_TOKEN
+        if not self.access_token:
+            logger.error("Dropbox access token not found in environment variables")
+            raise ValueError("DROPBOX_ACCESS_TOKEN environment variable is required")
+        
+        self.client = dropbox.Dropbox(self.access_token)
+        self.monitor_folder = Config.DROPBOX_MONITOR_FOLDER
+        
+    def test_connection(self) -> bool:
+        """Test the Dropbox connection"""
+        try:
+            account = self.client.users_get_current_account()
+            logger.info(f"Connected to Dropbox account: {account.email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to connect to Dropbox: {str(e)}")
+            return False
+    
+    def list_files(self, folder_path: str = None) -> List[Dict]:
+        """List files in the specified folder"""
+        if folder_path is None:
+            folder_path = self.monitor_folder
+            
+        try:
+            files = []
+            result = self.client.files_list_folder(folder_path)
+            
+            for entry in result.entries:
+                if isinstance(entry, dropbox.files.FileMetadata):
+                    # Check if file type is supported
+                    file_ext = os.path.splitext(entry.name)[1].lower()
+                    if file_ext in Config.SUPPORTED_FILE_TYPES:
+                        files.append({
+                            'name': entry.name,
+                            'path': entry.path_lower,
+                            'size': entry.size,
+                            'modified': entry.client_modified,
+                            'content_hash': entry.content_hash
+                        })
+            
+            # Handle pagination if there are more files
+            while result.has_more:
+                result = self.client.files_list_folder_continue(result.cursor)
+                for entry in result.entries:
+                    if isinstance(entry, dropbox.files.FileMetadata):
+                        file_ext = os.path.splitext(entry.name)[1].lower()
+                        if file_ext in Config.SUPPORTED_FILE_TYPES:
+                            files.append({
+                                'name': entry.name,
+                                'path': entry.path_lower,
+                                'size': entry.size,
+                                'modified': entry.client_modified,
+                                'content_hash': entry.content_hash
+                            })
+            
+            logger.info(f"Found {len(files)} supported files in {folder_path}")
+            return files
+            
+        except dropbox.exceptions.ApiError as e:
+            logger.error(f"Dropbox API error while listing files: {str(e)}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error while listing files: {str(e)}")
+            return []
+    
+    def download_file(self, file_path: str) -> Optional[bytes]:
+        """Download a file from Dropbox"""
+        try:
+            _, response = self.client.files_download(file_path)
+            logger.info(f"Downloaded file: {file_path} ({len(response.content)} bytes)")
+            return response.content
+        except dropbox.exceptions.ApiError as e:
+            logger.error(f"Dropbox API error while downloading {file_path}: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error while downloading {file_path}: {str(e)}")
+            return None
+    
+    def get_file_metadata(self, file_path: str) -> Optional[Dict]:
+        """Get metadata for a specific file"""
+        try:
+            metadata = self.client.files_get_metadata(file_path)
+            if isinstance(metadata, dropbox.files.FileMetadata):
+                return {
+                    'name': metadata.name,
+                    'path': metadata.path_lower,
+                    'size': metadata.size,
+                    'modified': metadata.client_modified,
+                    'content_hash': metadata.content_hash
+                }
+        except dropbox.exceptions.ApiError as e:
+            logger.error(f"Dropbox API error while getting metadata for {file_path}: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error while getting metadata for {file_path}: {str(e)}")
+            return None
+    
+    def scan_for_new_files(self, processed_files: List[str]) -> List[Dict]:
+        """Scan for new files that haven't been processed yet"""
+        try:
+            all_files = self.list_files()
+            new_files = []
+            
+            for file_info in all_files:
+                # Check if file has already been processed
+                if file_info['path'] not in processed_files:
+                    # Additional validation
+                    if self._is_valid_file(file_info):
+                        new_files.append(file_info)
+                        logger.info(f"Found new file: {file_info['name']}")
+            
+            logger.info(f"Found {len(new_files)} new files to process")
+            return new_files
+            
+        except Exception as e:
+            logger.error(f"Error scanning for new files: {str(e)}")
+            return []
+    
+    def _is_valid_file(self, file_info: Dict) -> bool:
+        """Validate if a file should be processed"""
+        # Check file size
+        max_size_bytes = Config.MAX_FILE_SIZE_MB * 1024 * 1024
+        if file_info['size'] > max_size_bytes:
+            logger.warning(f"File {file_info['name']} is too large ({file_info['size']} bytes)")
+            return False
+        
+        # Check file extension
+        file_ext = os.path.splitext(file_info['name'])[1].lower()
+        if file_ext not in Config.SUPPORTED_FILE_TYPES:
+            logger.warning(f"File {file_info['name']} has unsupported extension: {file_ext}")
+            return False
+        
+        # Check if file is recent (within last 30 days for initial processing)
+        if file_info['modified']:
+            days_old = (datetime.now(timezone.utc) - file_info['modified']).days
+            if days_old > 30:
+                logger.info(f"Skipping old file {file_info['name']} (modified {days_old} days ago)")
+                return False
+        
+        return True
+    
+    def create_backup_folder(self, folder_name: str) -> bool:
+        """Create a backup folder for processed files"""
+        try:
+            backup_path = f"{self.monitor_folder}/processed/{folder_name}"
+            self.client.files_create_folder_v2(backup_path)
+            logger.info(f"Created backup folder: {backup_path}")
+            return True
+        except dropbox.exceptions.ApiError as e:
+            if "path/conflict/folder" in str(e):
+                logger.info(f"Backup folder already exists: {backup_path}")
+                return True
+            logger.error(f"Error creating backup folder: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error creating backup folder: {str(e)}")
+            return False

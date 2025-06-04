@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Settings - Therapy Transcript Processor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            background-color: #343a40;
+        }
+        .sidebar-sticky {
+            position: relative;
+            top: 0;
+            height: calc(100vh - 48px);
+            padding-top: .5rem;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        .nav-link {
+            color: #ced4da;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+        }
+        .nav-link:hover {
+            color: #fff;
+        }
+        .nav-link.active {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .nav-link i {
+            margin-right: 10px;
+        }
+        main {
+            padding-top: 30px;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .api-key-input {
+            font-family: monospace;
+        }
+        .form-text {
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="sidebar-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('upload') }}">
+                                <i class="bi bi-cloud-upload"></i> Upload Transcript
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{{ url_for('settings') }}">
+                                <i class="bi bi-gear"></i> API Settings
+                            </a>
+                        </li>
+                        <li class="nav-item mt-5">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">API Settings</h1>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category if category != 'error' else 'danger' }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Configure API Keys</h5>
+                        <p class="card-text">Enter your API keys for the services below. These keys are required for the application to function properly.</p>
+                        
+                        <form method="POST" action="{{ url_for('settings') }}">
+                            <div class="mb-4">
+                                <h6 class="fw-bold">Dropbox Integration</h6>
+                                <div class="mb-3">
+                                    <label for="dropbox_token" class="form-label">Dropbox Access Token</label>
+                                    <input type="password" class="form-control api-key-input" id="dropbox_token" name="dropbox_token" value="{{ api_keys.dropbox_token }}" autocomplete="off">
+                                    <div class="form-text">Used to access and monitor your Dropbox folder for new transcripts.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="dropbox_folder" class="form-label">Dropbox Folder Path</label>
+                                    <input type="text" class="form-control" id="dropbox_folder" name="dropbox_folder" value="{{ api_keys.dropbox_folder }}" placeholder="/apps/otter">
+                                    <div class="form-text">Path to the folder in your Dropbox account that will be monitored for new transcripts.</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="fw-bold">AI Services</h6>
+                                <div class="mb-3">
+                                    <label for="openai_key" class="form-label">OpenAI API Key</label>
+                                    <input type="password" class="form-control api-key-input" id="openai_key" name="openai_key" value="{{ api_keys.openai_key }}" autocomplete="off">
+                                    <div class="form-text">Used for processing transcripts with GPT-4. Primary AI service.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="claude_key" class="form-label">Claude API Key</label>
+                                    <input type="password" class="form-control api-key-input" id="claude_key" name="claude_key" value="{{ api_keys.claude_key }}" autocomplete="off">
+                                    <div class="form-text">Used as fallback if OpenAI processing fails.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="gemini_key" class="form-label">Gemini API Key</label>
+                                    <input type="password" class="form-control api-key-input" id="gemini_key" name="gemini_key" value="{{ api_keys.gemini_key }}" autocomplete="off">
+                                    <div class="form-text">Used as secondary fallback if both OpenAI and Claude fail.</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="fw-bold">Notion Integration</h6>
+                                <div class="mb-3">
+                                    <label for="notion_key" class="form-label">Notion API Key</label>
+                                    <input type="password" class="form-control api-key-input" id="notion_key" name="notion_key" value="{{ api_keys.notion_key }}" autocomplete="off">
+                                    <div class="form-text">Used to create and update databases in your Notion workspace.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="notion_parent_id" class="form-label">Notion Parent Page ID</label>
+                                    <input type="text" class="form-control api-key-input" id="notion_parent_id" name="notion_parent_id" value="{{ api_keys.notion_parent_id }}" autocomplete="off">
+                                    <div class="form-text">ID of the parent page where client databases will be created. Find this in the URL of your Notion page.</div>
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">Save API Keys</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Security Information</h5>
+                        <p class="card-text">Your API keys are stored securely and are only used to access the respective services on your behalf. The keys are not shared with any third parties.</p>
+                        <ul>
+                            <li>Keys are stored in an encrypted format</li>
+                            <li>Keys are only accessible to your account</li>
+                            <li>You can update or remove keys at any time</li>
+                            <li>For maximum security, use keys with limited permissions</li>
+                        </ul>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle password visibility
+            const toggleButtons = document.querySelectorAll('.toggle-password');
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const input = document.querySelector(this.getAttribute('data-target'));
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        this.innerHTML = '<i class="bi bi-eye-slash"></i>';
+                    } else {
+                        input.type = 'password';
+                        this.innerHTML = '<i class="bi bi-eye"></i>';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

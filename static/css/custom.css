@@ -1,0 +1,403 @@
+/* Custom CSS for Therapy Transcript Processor */
+
+/* Healthcare-themed color variables */
+:root {
+    --healthcare-primary: hsl(210, 100%, 50%);
+    --healthcare-success: hsl(142, 71%, 45%);
+    --healthcare-warning: hsl(45, 100%, 51%);
+    --healthcare-danger: hsl(354, 70%, 54%);
+    --healthcare-info: hsl(188, 78%, 41%);
+    --healthcare-light: hsl(210, 17%, 95%);
+    --healthcare-dark: hsl(210, 11%, 15%);
+}
+
+/* Override Bootstrap variables for better healthcare theme consistency */
+.btn-primary {
+    background-color: var(--healthcare-primary);
+    border-color: var(--healthcare-primary);
+}
+
+.btn-primary:hover {
+    background-color: hsl(210, 100%, 45%);
+    border-color: hsl(210, 100%, 45%);
+}
+
+/* Custom card styling for analytics */
+.analytics-card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.analytics-card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* Custom stat cards */
+.stat-card {
+    background: linear-gradient(135deg, var(--bs-gray-800) 0%, var(--bs-gray-900) 100%);
+    border: 1px solid var(--bs-gray-700);
+    transition: transform 0.2s ease-in-out;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-number {
+    font-weight: 700;
+    font-size: 2rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Activity feed styling */
+.activity-feed {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.activity-item {
+    transition: background-color 0.15s ease-in-out;
+}
+
+.activity-item:hover {
+    background-color: var(--bs-gray-800);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin: -0.75rem -0.75rem 0.75rem -0.75rem;
+}
+
+.activity-icon {
+    width: 1.5rem;
+    text-align: center;
+}
+
+.activity-meta {
+    opacity: 0.7;
+}
+
+/* Metric cards for progress tracking */
+.metric-card {
+    background: var(--bs-gray-800);
+    border-color: var(--bs-gray-700);
+    transition: border-color 0.15s ease-in-out;
+}
+
+.metric-card:hover {
+    border-color: var(--healthcare-primary);
+}
+
+.metric-title {
+    color: var(--bs-gray-300);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.metric-value {
+    font-weight: 600;
+}
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    background-color: var(--bs-gray-800);
+    border: 2px dashed var(--bs-gray-600);
+    border-radius: 0.375rem;
+    color: var(--bs-gray-500);
+}
+
+/* Status badges with enhanced styling */
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 50rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+/* Processing status indicators */
+.processing-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.processing-status .spinner-border {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Therapy-specific styling */
+.mood-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.mood-positive {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--healthcare-success);
+}
+
+.mood-neutral {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: var(--healthcare-warning);
+}
+
+.mood-negative {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--healthcare-danger);
+}
+
+/* Theme tags styling */
+.theme-tag {
+    background-color: var(--bs-info);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    margin: 0.125rem;
+    display: inline-block;
+}
+
+/* Settings page specific styling */
+.setup-instructions {
+    padding-left: 1.5rem;
+}
+
+.setup-instructions li {
+    margin-bottom: 0.75rem;
+    line-height: 1.6;
+}
+
+.config-item {
+    padding: 0.75rem;
+    background-color: var(--bs-gray-800);
+    border-radius: 0.375rem;
+    border: 1px solid var(--bs-gray-700);
+}
+
+.config-item .form-label {
+    font-weight: 600;
+    color: var(--bs-gray-200);
+}
+
+/* Service status cards */
+.service-status-card {
+    border-left: 4px solid transparent;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.service-status-card.connected {
+    border-left-color: var(--healthcare-success);
+}
+
+.service-status-card.disconnected {
+    border-left-color: var(--healthcare-danger);
+}
+
+/* Log entries styling */
+.log-entry {
+    padding: 0.75rem;
+    background-color: var(--bs-gray-800);
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+}
+
+.log-message {
+    color: var(--bs-gray-100);
+}
+
+.log-meta {
+    color: var(--bs-gray-400);
+    font-size: 0.875rem;
+}
+
+.log-error {
+    background-color: rgba(220, 53, 69, 0.1);
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    border-left: 3px solid var(--healthcare-danger);
+}
+
+/* Progress bars with healthcare theme */
+.progress {
+    background-color: var(--bs-gray-800);
+}
+
+.progress-bar {
+    transition: width 0.3s ease-in-out;
+}
+
+/* Breadcrumb styling */
+.breadcrumb {
+    background-color: transparent;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    color: var(--bs-gray-500);
+}
+
+/* Empty state styling */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--bs-gray-500);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state h5 {
+    color: var(--bs-gray-400);
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    max-width: 400px;
+    margin: 0 auto 1.5rem;
+    line-height: 1.6;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .stat-number {
+        font-size: 1.5rem;
+    }
+    
+    .metric-card {
+        margin-bottom: 1rem;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+    
+    .activity-item:hover {
+        margin: 0;
+        padding: 0.75rem 0;
+    }
+}
+
+/* Animation for loading states */
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+.loading-pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Smooth transitions for interactive elements */
+.btn, .card, .badge, .alert {
+    transition: all 0.15s ease-in-out;
+}
+
+/* Focus states for accessibility */
+.btn:focus,
+.form-control:focus,
+.form-select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(var(--healthcare-primary), 0.25);
+}
+
+/* Custom scrollbar for dark theme */
+.activity-feed::-webkit-scrollbar,
+#logsContent::-webkit-scrollbar {
+    width: 8px;
+}
+
+.activity-feed::-webkit-scrollbar-track,
+#logsContent::-webkit-scrollbar-track {
+    background: var(--bs-gray-800);
+    border-radius: 4px;
+}
+
+.activity-feed::-webkit-scrollbar-thumb,
+#logsContent::-webkit-scrollbar-thumb {
+    background: var(--bs-gray-600);
+    border-radius: 4px;
+}
+
+.activity-feed::-webkit-scrollbar-thumb:hover,
+#logsContent::-webkit-scrollbar-thumb:hover {
+    background: var(--bs-gray-500);
+}
+
+/* Print styles for reports */
+@media print {
+    .navbar,
+    .btn-group,
+    .modal,
+    footer {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #ddd !important;
+        box-shadow: none !important;
+    }
+    
+    .table {
+        font-size: 0.875rem;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .card {
+        border-width: 2px;
+    }
+    
+    .btn {
+        border-width: 2px;
+    }
+    
+    .badge {
+        border: 1px solid currentColor;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .btn,
+    .card,
+    .stat-card,
+    .activity-item {
+        transition: none;
+    }
+    
+    .loading-pulse {
+        animation: none;
+    }
+}

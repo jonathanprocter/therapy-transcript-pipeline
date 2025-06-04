@@ -1,0 +1,798 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client.name }} - Client Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ client.name }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1><i class="fas fa-user me-2"></i>{{ client.name }}</h1>
+                <p class="text-muted mb-0">
+                    Client since {{ client.created_at.strftime('%B %d, %Y') if client.created_at else 'Unknown' }}
+                    {% if client.notion_database_id %}
+                        <span class="badge bg-success ms-2">
+                            <i class="fas fa-check me-1"></i>Notion Connected
+                        </span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="btn-group">
+                {% if transcripts|length >= 2 %}
+                <button class="btn btn-primary" onclick="generateLongitudinalAnalysis()">
+                    <i class="fas fa-chart-line me-1"></i>Longitudinal Analysis
+                </button>
+                {% endif %}
+                <button class="btn btn-outline-secondary" onclick="refreshAnalytics()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analytics Dashboard -->
+{% if dashboard_data %}
+<div class="row mb-4">
+    <!-- Mood Trend Chart -->
+    {% if dashboard_data.mood_chart %}
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Mood Trend Over Time
+                </h5>
+            </div>
+            <div class="card-body">
+                <img src="data:image/png;base64,{{ dashboard_data.mood_chart }}" 
+                     class="img-fluid" alt="Mood Trend Chart">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Session Summary -->
+    {% if dashboard_data.session_summary %}
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Session Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="summary-stats">
+                    <div class="stat-item mb-3">
+                        <div class="stat-label text-muted">Total Sessions</div>
+                        <div class="stat-value h4">{{ dashboard_data.session_summary.total_sessions or 0 }}</div>
+                    </div>
+                    
+                    {% if dashboard_data.session_summary.date_range %}
+                    <div class="stat-item mb-3">
+                        <div class="stat-label text-muted">Date Range</div>
+                        <div class="stat-value">{{ dashboard_data.session_summary.date_range }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if dashboard_data.session_summary.avg_mood_score %}
+                    <div class="stat-item mb-3">
+                        <div class="stat-label text-muted">Average Mood</div>
+                        <div class="stat-value h4">
+                            {{ "%.1f"|format(dashboard_data.session_summary.avg_mood_score) }}/10
+                            {% set mood_score = dashboard_data.session_summary.avg_mood_score %}
+                            {% if mood_score >= 7 %}
+                                <i class="fas fa-smile text-success ms-1"></i>
+                            {% elif mood_score >= 5 %}
+                                <i class="fas fa-meh text-warning ms-1"></i>
+                            {% else %}
+                                <i class="fas fa-frown text-danger ms-1"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Theme Frequency Chart -->
+    {% if dashboard_data.theme_chart %}
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tags me-2"></i>Most Frequent Themes
+                </h5>
+            </div>
+            <div class="card-body">
+                <img src="data:image/png;base64,{{ dashboard_data.theme_chart }}" 
+                     class="img-fluid" alt="Theme Frequency Chart">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Sentiment Distribution -->
+    {% if dashboard_data.sentiment_chart %}
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-heart me-2"></i>Sentiment Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                <img src="data:image/png;base64,{{ dashboard_data.sentiment_chart }}" 
+                     class="img-fluid" alt="Sentiment Distribution Chart">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Progress Metrics -->
+{% if dashboard_data.progress_metrics %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-trending-up me-2"></i>Progress Metrics
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% if dashboard_data.progress_metrics.mood_trend %}
+                    <div class="col-md-4">
+                        <div class="metric-card p-3 border rounded">
+                            <h6 class="metric-title">Mood Trend</h6>
+                            <div class="metric-value">
+                                {% set trend = dashboard_data.progress_metrics.mood_trend.direction %}
+                                <span class="badge {% if trend == 'improving' %}bg-success{% elif trend == 'declining' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                    {% if trend == 'improving' %}
+                                        <i class="fas fa-arrow-up me-1"></i>Improving
+                                    {% elif trend == 'declining' %}
+                                        <i class="fas fa-arrow-down me-1"></i>Declining
+                                    {% else %}
+                                        <i class="fas fa-minus me-1"></i>Stable
+                                    {% endif %}
+                                </span>
+                                {% if dashboard_data.progress_metrics.mood_trend.change %}
+                                <div class="small text-muted mt-1">
+                                    Change: {{ "%.1f"|format(dashboard_data.progress_metrics.mood_trend.change) }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if dashboard_data.progress_metrics.session_frequency %}
+                    <div class="col-md-4">
+                        <div class="metric-card p-3 border rounded">
+                            <h6 class="metric-title">Session Frequency</h6>
+                            <div class="metric-value">
+                                <span class="h5">{{ "%.1f"|format(dashboard_data.progress_metrics.session_frequency) }}</span>
+                                <small class="text-muted">sessions/week</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Insights -->
+{% if dashboard_data.insights %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>Key Insights
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for insight in dashboard_data.insights %}
+                <div class="alert alert-info mb-2">
+                    <i class="fas fa-info-circle me-2"></i>{{ insight }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Session Transcripts -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-alt me-2"></i>Session Transcripts
+                    <span class="badge bg-secondary ms-2">{{ transcripts|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if transcripts %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Session Date</th>
+                                    <th>File Name</th>
+                                    <th>Status</th>
+                                    <th>Mood Score</th>
+                                    <th>Key Themes</th>
+                                    <th>Notion Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transcript in transcripts %}
+                                <tr>
+                                    <td>
+                                        {% if transcript.session_date %}
+                                            {{ transcript.session_date.strftime('%m/%d/%Y') }}
+                                        {% else %}
+                                            <span class="text-muted">Unknown</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="text-truncate" style="max-width: 200px;" 
+                                              title="{{ transcript.original_filename }}">
+                                            {{ transcript.original_filename }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if transcript.processing_status == 'completed' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Completed
+                                            </span>
+                                        {% elif transcript.processing_status == 'processing' %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-spinner fa-spin me-1"></i>Processing
+                                            </span>
+                                        {% elif transcript.processing_status == 'failed' %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times me-1"></i>Failed
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-clock me-1"></i>Pending
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if transcript.sentiment_score %}
+                                            <span class="badge {% if transcript.sentiment_score >= 7 %}bg-success{% elif transcript.sentiment_score >= 5 %}bg-warning{% else %}bg-danger{% endif %}">
+                                                {{ transcript.sentiment_score }}/10
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if transcript.key_themes %}
+                                            {% for theme in transcript.key_themes[:3] %}
+                                                <span class="badge bg-info me-1">{{ theme }}</span>
+                                            {% endfor %}
+                                            {% if transcript.key_themes|length > 3 %}
+                                                <span class="badge bg-secondary">+{{ transcript.key_themes|length - 3 }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">None</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if transcript.notion_synced %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Synced
+                                            </span>
+                                        {% elif transcript.notion_sync_error %}
+                                            <span class="badge bg-danger" 
+                                                  title="{{ transcript.notion_sync_error }}">
+                                                <i class="fas fa-exclamation me-1"></i>Error
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-clock me-1"></i>Pending
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" 
+                                                    onclick="viewAnalysis({{ transcript.id }})"
+                                                    {% if transcript.processing_status != 'completed' %}disabled{% endif %}>
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if transcript.processing_status == 'failed' %}
+                                            <button class="btn btn-outline-warning" 
+                                                    onclick="reprocessTranscript({{ transcript.id }})">
+                                                <i class="fas fa-redo"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No Session Transcripts</h5>
+                        <p class="text-muted mb-3">
+                            No therapy session transcripts have been processed for this client yet.
+                            Transcripts are automatically processed when uploaded to the monitored Dropbox folder.
+                        </p>
+                        <button class="btn btn-primary" onclick="triggerManualScan()">
+                            <i class="fas fa-sync-alt me-1"></i>Check for New Files
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analysis Modal -->
+<div class="modal fade" id="analysisModal" tabindex="-1" aria-labelledby="analysisModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="analysisModalLabel">
+                    <i class="fas fa-chart-bar me-2"></i>Transcript Analysis
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="analysisContent">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading analysis...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Longitudinal Analysis Modal -->
+<div class="modal fade" id="longitudinalModal" tabindex="-1" aria-labelledby="longitudinalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="longitudinalModalLabel">
+                    <i class="fas fa-chart-line me-2"></i>Longitudinal Analysis - {{ client.name }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="longitudinalContent">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Generating longitudinal analysis...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// View transcript analysis
+function viewAnalysis(transcriptId) {
+    const modal = new bootstrap.Modal(document.getElementById('analysisModal'));
+    modal.show();
+    
+    // Reset content
+    document.getElementById('analysisContent').innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading analysis...</p>
+        </div>
+    `;
+    
+    fetch(`/api/transcript/${transcriptId}/analysis`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('analysisContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Error:</strong> ${data.error}
+                </div>
+            `;
+        } else {
+            displayAnalysisResults(data);
+        }
+    })
+    .catch(error => {
+        document.getElementById('analysisContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Error:</strong> ${error.message}
+            </div>
+        `;
+    });
+}
+
+function displayAnalysisResults(data) {
+    let html = '<div class="row">';
+    
+    // Sentiment Score
+    if (data.sentiment_score) {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-heart me-2"></i>Mood Score</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="h2 mb-0">${data.sentiment_score}/10</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Key Themes
+    if (data.key_themes && data.key_themes.length > 0) {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-tags me-2"></i>Key Themes</h6>
+                    </div>
+                    <div class="card-body">
+        `;
+        data.key_themes.forEach(theme => {
+            html += `<span class="badge bg-info me-1 mb-1">${theme}</span>`;
+        });
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // AI Analysis Tabs
+    html += `
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="analysisTab" role="tablist">
+    `;
+    
+    let tabIndex = 0;
+    if (data.openai_analysis) {
+        html += `
+            <li class="nav-item" role="presentation">
+                <button class="nav-link ${tabIndex === 0 ? 'active' : ''}" id="openai-tab" data-bs-toggle="tab" 
+                        data-bs-target="#openai" type="button" role="tab">
+                    OpenAI Analysis
+                </button>
+            </li>
+        `;
+        tabIndex++;
+    }
+    
+    if (data.anthropic_analysis) {
+        html += `
+            <li class="nav-item" role="presentation">
+                <button class="nav-link ${tabIndex === 0 ? 'active' : ''}" id="anthropic-tab" data-bs-toggle="tab" 
+                        data-bs-target="#anthropic" type="button" role="tab">
+                    Anthropic Analysis
+                </button>
+            </li>
+        `;
+        tabIndex++;
+    }
+    
+    if (data.gemini_analysis) {
+        html += `
+            <li class="nav-item" role="presentation">
+                <button class="nav-link ${tabIndex === 0 ? 'active' : ''}" id="gemini-tab" data-bs-toggle="tab" 
+                        data-bs-target="#gemini" type="button" role="tab">
+                    Gemini Analysis
+                </button>
+            </li>
+        `;
+    }
+    
+    html += `
+            </ul>
+            <div class="tab-content" id="analysisTabContent">
+    `;
+    
+    // AI Analysis Content
+    tabIndex = 0;
+    if (data.openai_analysis) {
+        html += `
+            <div class="tab-pane fade ${tabIndex === 0 ? 'show active' : ''}" id="openai" role="tabpanel">
+                <div class="p-3">
+                    ${formatAnalysisData(data.openai_analysis)}
+                </div>
+            </div>
+        `;
+        tabIndex++;
+    }
+    
+    if (data.anthropic_analysis) {
+        html += `
+            <div class="tab-pane fade ${tabIndex === 0 ? 'show active' : ''}" id="anthropic" role="tabpanel">
+                <div class="p-3">
+                    ${formatAnalysisData(data.anthropic_analysis)}
+                </div>
+            </div>
+        `;
+        tabIndex++;
+    }
+    
+    if (data.gemini_analysis) {
+        html += `
+            <div class="tab-pane fade ${tabIndex === 0 ? 'show active' : ''}" id="gemini" role="tabpanel">
+                <div class="p-3">
+                    ${formatAnalysisData(data.gemini_analysis)}
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+        </div>
+    </div>`;
+    
+    document.getElementById('analysisContent').innerHTML = html;
+}
+
+function formatAnalysisData(analysis) {
+    let html = '';
+    
+    if (analysis.session_summary) {
+        html += `
+            <div class="mb-3">
+                <h6>Session Summary</h6>
+                <p>${analysis.session_summary}</p>
+            </div>
+        `;
+    }
+    
+    if (analysis.key_topics && analysis.key_topics.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6>Key Topics</h6>
+                <div>
+        `;
+        analysis.key_topics.forEach(topic => {
+            html += `<span class="badge bg-secondary me-1">${topic}</span>`;
+        });
+        html += `</div></div>`;
+    }
+    
+    if (analysis.therapeutic_techniques && analysis.therapeutic_techniques.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6>Therapeutic Techniques</h6>
+                <div>
+        `;
+        analysis.therapeutic_techniques.forEach(technique => {
+            html += `<span class="badge bg-success me-1">${technique}</span>`;
+        });
+        html += `</div></div>`;
+    }
+    
+    if (analysis.sentiment_analysis) {
+        html += `
+            <div class="mb-3">
+                <h6>Sentiment Analysis</h6>
+                <ul>
+                    <li><strong>Overall Sentiment:</strong> ${analysis.sentiment_analysis.overall_sentiment || 'N/A'}</li>
+                    <li><strong>Emotional Tone:</strong> ${analysis.sentiment_analysis.emotional_tone || 'N/A'}</li>
+                    <li><strong>Engagement Level:</strong> ${analysis.sentiment_analysis.engagement_level || 'N/A'}</li>
+                </ul>
+            </div>
+        `;
+    }
+    
+    return html || '<p class="text-muted">No detailed analysis available.</p>';
+}
+
+// Reprocess transcript
+function reprocessTranscript(transcriptId) {
+    if (!confirm('Are you sure you want to reprocess this transcript?')) {
+        return;
+    }
+    
+    showLoading();
+    
+    fetch(`/api/reprocess-transcript/${transcriptId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        
+        if (data.error) {
+            showAlert('Error: ' + data.error, 'danger');
+        } else {
+            showAlert(data.message, 'success');
+            setTimeout(() => location.reload(), 1500);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('Error: ' + error.message, 'danger');
+    });
+}
+
+// Generate longitudinal analysis
+function generateLongitudinalAnalysis() {
+    const modal = new bootstrap.Modal(document.getElementById('longitudinalModal'));
+    modal.show();
+    
+    // Reset content
+    document.getElementById('longitudinalContent').innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Generating longitudinal analysis...</p>
+        </div>
+    `;
+    
+    fetch(`/client/{{ client.id }}/longitudinal-analysis`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('longitudinalContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Error:</strong> ${data.error}
+                </div>
+            `;
+        } else {
+            displayLongitudinalResults(data);
+        }
+    })
+    .catch(error => {
+        document.getElementById('longitudinalContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Error:</strong> ${error.message}
+            </div>
+        `;
+    });
+}
+
+function displayLongitudinalResults(data) {
+    // Use the same function from dashboard.html
+    let html = '<div class="row">';
+    
+    // Overall Progress
+    if (data.overall_progress) {
+        html += `
+            <div class="col-12 mb-3">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-chart-line me-2"></i>Overall Progress</h6>
+                    <p class="mb-0">${data.overall_progress}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Trend Analysis
+    if (data.trend_analysis) {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-trending-up me-2"></i>Trends</h6>
+                    </div>
+                    <div class="card-body">
+        `;
+        
+        for (const [key, value] of Object.entries(data.trend_analysis)) {
+            html += `
+                <div class="d-flex justify-content-between mb-2">
+                    <span>${key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}:</span>
+                    <span class="fw-bold">${value}</span>
+                </div>
+            `;
+        }
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Recurring Themes
+    if (data.recurring_themes && data.recurring_themes.length > 0) {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-tags me-2"></i>Recurring Themes</h6>
+                    </div>
+                    <div class="card-body">
+        `;
+        
+        data.recurring_themes.forEach(theme => {
+            html += `<span class="badge bg-secondary me-1 mb-1">${theme}</span>`;
+        });
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Areas for Focus
+    if (data.areas_for_focus && data.areas_for_focus.length > 0) {
+        html += `
+            <div class="col-12 mb-3">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Areas for Focus</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="mb-0">
+        `;
+        
+        data.areas_for_focus.forEach(area => {
+            html += `<li>${area}</li>`;
+        });
+        
+        html += `
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    
+    document.getElementById('longitudinalContent').innerHTML = html;
+}
+
+// Refresh analytics
+function refreshAnalytics() {
+    showLoading();
+    location.reload();
+}
+</script>
+{% endblock %}
