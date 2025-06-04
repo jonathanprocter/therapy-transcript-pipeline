@@ -19,6 +19,12 @@ if __name__ == "__main__":
     try:
         logger.info("=== Starting Therapy Transcript Processor ===")
         
+        # Test database connection
+        with app.app_context():
+            from models import Client
+            client_count = Client.query.count()
+            logger.info(f"Database connection successful - {client_count} clients found")
+        
         # Start the background scheduler for monitoring Dropbox
         logger.info("Initializing background scheduler...")
         start_background_scheduler()
@@ -28,6 +34,7 @@ if __name__ == "__main__":
         port = int(os.environ.get("PORT", 5000))
         logger.info(f"Starting Flask app on host 0.0.0.0 port {port}")
         logger.info("Application ready to accept connections")
+        logger.info("=== Application startup completed successfully ===")
         
         app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
         

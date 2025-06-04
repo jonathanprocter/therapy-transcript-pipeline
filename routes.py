@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify, redirect, url_for, flash
 from app import app, db
 from models import Client, Transcript, ProcessingLog, SystemSettings
 from services.dropbox_service import DropboxService
-from services.ai_service import AIService
+fromservices.ai_service import AIService
 from services.notion_service import NotionService
 from services.analytics_service import AnalyticsService
 from services.emotional_analysis import EmotionalAnalysis
@@ -272,7 +272,7 @@ def manual_scan():
                 thread = threading.Thread(target=process_new_files)
                 thread.daemon = True
                 thread.start()
-                
+
                 return jsonify({
                     'message': f'Scan completed. Found {len(new_files)} new files. Processing started.',
                     'new_files': [f.get('name', 'Unknown') for f in new_files] if new_files else []
@@ -377,6 +377,16 @@ def get_processing_logs():
 
     except Exception as e:
         logger.error(f"Error getting processing logs: {str(e)}")
+        # Return empty array instead of error
+        return jsonify([])
+
+@app.route('/api/scan-dropbox', methods=['POST'])
+def scan_dropbox():
+    """Alternative endpoint for Dropbox scanning"""
+    try:
+        return manual_scan()
+    except Exception as e:
+        logger.error(f"Error in scan-dropbox endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/transcript/<int:transcript_id>/analysis')

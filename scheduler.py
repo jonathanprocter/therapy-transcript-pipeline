@@ -193,6 +193,74 @@ class BackgroundScheduler:
             logger.error(f"Error extracting client name from {filename}: {str(e)}")
             return "Unknown Client"
 
+def process_new_files():
+    """Process new files discovered by manual scan"""
+    try:
+        with app.app_context():
+            logger.info("Starting background processing of new files")
+            
+            # Get files that are pending processing
+            pending_transcripts = db.session.query(Transcript).filter_by(
+                processing_status='pending'
+            ).limit(5).all()
+            
+            if not pending_transcripts:
+                logger.info("No pending transcripts to process")
+                return
+            
+            from services.ai_service import AIService
+            from services.document_processor import DocumentProcessor
+            from services.dropbox_service import DropboxService
+            
+            # Initialize services
+            ai_service = AIService()
+            doc_processor = DocumentProcessor()
+            dropbox_service = DropboxService()
+            
+            for transcript in pending_transcripts:
+                try:
+                    logger.info(f"Processing transcript: {transcript.original_filename}")
+                    
+                    # Download file content if needed
+                    if not transcript.raw_content and transcript.dropbox_path:
+                        file_content = dropbox_service.download_file(transcript.dropbox_path)
+                        if file_content:
+                            doc_result = doc_processor.process_document(file_content, transcript.original_filename)
+                            transcript.raw_content = doc_result.get('cleaned_content', '')
+                    
+                    # Process with AI if we have content
+                    if transcript.raw_content and ai_service:
+                        analysis_result = ai_service.analyze_transcript(transcript.raw_content)
+                        
+                        if analysis_result:
+                            transcript.openai_analysis = analysis_result.get('openai_analysis')
+                            transcript.anthropic_analysis = analysis_result.get('anthropic_analysis')
+                            transcript.sentiment_score = analysis_result.get('sentiment_score', 0.0)
+                            transcript.key_themes = analysis_result.get('key_themes')
+                            transcript.therapy_insights = analysis_result.get('therapy_insights')
+                            transcript.processing_status = 'completed'
+                            transcript.processed_at = datetime.now(timezone.utc)
+                            
+                            logger.info(f"Successfully processed: {transcript.original_filename}")
+                        else:
+                            transcript.processing_status = 'failed'
+                            logger.warning(f"AI analysis failed for: {transcript.original_filename}")
+                    else:
+                        transcript.processing_status = 'failed'
+                        logger.warning(f"No content available for: {transcript.original_filename}")
+                    
+                    db.session.commit()
+                    
+                except Exception as e:
+                    logger.error(f"Error processing transcript {transcript.id}: {str(e)}")
+                    transcript.processing_status = 'failed'
+                    db.session.commit()
+                    
+            logger.info("Background processing completed")
+            
+    except Exception as e:
+        logger.error(f"Error in background processing: {str(e)}")
+
 # Global scheduler instance
 scheduler = None
 

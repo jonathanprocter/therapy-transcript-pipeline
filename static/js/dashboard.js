@@ -194,27 +194,55 @@ function updateServiceStatus(service, status) {
 
 // Manual scan trigger
 function triggerManualScan() {
-    const button = document.getElementById('manualScanBtn');
-    if (button) {
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning...';
-    }
+    const scanBtn = document.getElementById('manualScanBtn');
+    if (scanBtn) {
+        scanBtn.disabled = true;
+        scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning...';
 
-    fetch('/api/manual-scan', { method: 'POST' })
-        .then(response => response.json())
+        fetch('/api/manual-scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            showAlert(data.message || 'Scan completed', 'success');
-            loadSystemStats(); // Refresh stats
+            if (data.error) {
+                showAlert('Scan failed: ' + data.error, 'danger');
+                updateServiceStatus('dropbox', 'error');
+            } else {
+                showAlert(data.message || 'Scan completed successfully', 'success');
+                updateServiceStatus('dropbox', 'operational');
+
+                // Update new files count if available
+                if (data.new_files && data.new_files.length > 0) {
+                    updateNewFilesCount(data.new_files.length);
+                } else {
+                    updateNewFilesCount(0);
+                }
+
+                // Refresh stats and logs
+                setTimeout(() => {
+                    loadSystemStats();
+                    loadProcessingLogs();
+                }, 2000);
+            }
         })
         .catch(error => {
-            showAlert('Scan failed: ' + error.message, 'danger');
+            console.error('Manual scan error:', error);
+            showAlert('Error performing manual scan: ' + error.message, 'danger');
+            updateServiceStatus('dropbox', 'error');
         })
         .finally(() => {
-            if (button) {
-                button.disabled = false;
-                button.innerHTML = '<i class="fas fa-sync me-1"></i>Manual Scan';
-            }
+            scanBtn.disabled = false;
+            scanBtn.innerHTML = '<i class="fas fa-sync me-1"></i>Manual Scan';
         });
+    }
 }
 
 // Show alert message
