@@ -297,18 +297,78 @@ class RichTextFormatter:
         return blocks
     
     def _create_paragraph_block(self, content: str) -> Dict[str, Any]:
-        """Create a paragraph block for Notion"""
+        """Create a paragraph block for Notion with proper content chunking"""
+        # Notion has a 2000 character limit per rich text block
+        # Split long content into multiple text objects within the same paragraph
+        max_chunk_size = 1900  # Leave some buffer
+        
+        if len(content) <= max_chunk_size:
+            return {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": content
+                            }
+                        }
+                    ]
+                }
+            }
+        
+        # Split content into chunks
+        chunks = []
+        remaining_content = content
+        
+        while remaining_content:
+            if len(remaining_content) <= max_chunk_size:
+                chunks.append(remaining_content)
+                break
+            
+            # Find a good break point (sentence end, paragraph break, or space)
+            chunk = remaining_content[:max_chunk_size]
+            break_point = max_chunk_size
+            
+            # Try to break at sentence end
+            for i in range(len(chunk) - 1, max(0, len(chunk) - 200), -1):
+                if chunk[i] in '.!?':
+                    break_point = i + 1
+                    break
+            
+            # If no sentence break, try paragraph break
+            if break_point == max_chunk_size:
+                for i in range(len(chunk) - 1, max(0, len(chunk) - 200), -1):
+                    if chunk[i] == '\n':
+                        break_point = i + 1
+                        break
+            
+            # If no paragraph break, try space
+            if break_point == max_chunk_size:
+                for i in range(len(chunk) - 1, max(0, len(chunk) - 100), -1):
+                    if chunk[i] == ' ':
+                        break_point = i + 1
+                        break
+            
+            chunks.append(remaining_content[:break_point])
+            remaining_content = remaining_content[break_point:]
+        
+        # Create rich text objects for each chunk
+        rich_text_objects = []
+        for chunk in chunks:
+            if chunk.strip():  # Only add non-empty chunks
+                rich_text_objects.append({
+                    "type": "text",
+                    "text": {
+                        "content": chunk
+                    }
+                })
+        
         return {
             "object": "block",
             "type": "paragraph",
             "paragraph": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {
-                            "content": content
-                        }
-                    }
-                ]
+                "rich_text": rich_text_objects
             }
         }

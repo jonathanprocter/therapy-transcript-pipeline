@@ -141,49 +141,66 @@ class NotionService:
                     ]
                 }
             
-            # Create content blocks with proper text length limits
+            # Create content blocks with complete content transfer (no truncation)
             content_blocks = []
             if rich_text_blocks:
-                # Process rich text blocks and ensure each text content is under 2000 chars
-                for block in rich_text_blocks:
-                    if block.get("type") == "paragraph" and block.get("paragraph", {}).get("rich_text"):
-                        for rich_text_item in block["paragraph"]["rich_text"]:
-                            if rich_text_item.get("text", {}).get("content"):
-                                text_content = rich_text_item["text"]["content"]
-                                if len(text_content) > 1900:  # Leave some buffer
-                                    rich_text_item["text"]["content"] = text_content[:1900] + "..."
-                    content_blocks.append(block)
+                # Use the rich text blocks as-is - they're already properly chunked by RichTextFormatter
+                content_blocks = rich_text_blocks
             else:
-                # Split long content into multiple paragraphs
+                # Split long content into multiple paragraphs without truncation
                 text_chunks = []
                 remaining_content = content
-                while remaining_content:
-                    chunk = remaining_content[:1900]
-                    # Try to break at sentence boundary
-                    if len(remaining_content) > 1900:
-                        last_period = chunk.rfind('.')
-                        if last_period > 1000:  # Only break if we find a reasonable sentence break
-                            chunk = chunk[:last_period + 1]
-                    
-                    text_chunks.append(chunk)
-                    remaining_content = remaining_content[len(chunk):]
+                max_chunk_size = 1900
                 
-                # Create paragraph blocks for each chunk
+                while remaining_content:
+                    if len(remaining_content) <= max_chunk_size:
+                        text_chunks.append(remaining_content)
+                        break
+                    
+                    # Find the best break point (sentence, paragraph, or space)
+                    chunk = remaining_content[:max_chunk_size]
+                    break_point = max_chunk_size
+                    
+                    # Try to break at sentence end
+                    for i in range(len(chunk) - 1, max(0, len(chunk) - 200), -1):
+                        if chunk[i] in '.!?':
+                            break_point = i + 1
+                            break
+                    
+                    # If no sentence break, try paragraph break
+                    if break_point == max_chunk_size:
+                        for i in range(len(chunk) - 1, max(0, len(chunk) - 200), -1):
+                            if chunk[i] == '\n':
+                                break_point = i + 1
+                                break
+                    
+                    # If no paragraph break, try space
+                    if break_point == max_chunk_size:
+                        for i in range(len(chunk) - 1, max(0, len(chunk) - 100), -1):
+                            if chunk[i] == ' ':
+                                break_point = i + 1
+                                break
+                    
+                    text_chunks.append(remaining_content[:break_point])
+                    remaining_content = remaining_content[break_point:]
+                
+                # Create paragraph blocks for each chunk (complete content, no truncation)
                 for chunk in text_chunks:
-                    content_blocks.append({
-                        "object": "block",
-                        "type": "paragraph",
-                        "paragraph": {
-                            "rich_text": [
-                                {
-                                    "type": "text",
-                                    "text": {
-                                        "content": chunk
+                    if chunk.strip():  # Only add non-empty chunks
+                        content_blocks.append({
+                            "object": "block",
+                            "type": "paragraph",
+                            "paragraph": {
+                                "rich_text": [
+                                    {
+                                        "type": "text",
+                                        "text": {
+                                            "content": chunk
+                                        }
                                     }
-                                }
-                            ]
-                        }
-                    })
+                                ]
+                            }
+                        })
 
             # Create the page
             page_data = {
