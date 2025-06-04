@@ -1,378 +1,446 @@
 """
-Email summary service for therapy session review and follow-up
+Email Summary Service for Therapy Progress Notes
+Generates and sends comprehensive session summaries with action items
 """
-
-import smtplib
+import os
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from typing import Dict, List, Optional
 from datetime import datetime
+from typing import Dict, List, Optional
 import re
 
 logger = logging.getLogger(__name__)
 
 class EmailSummaryService:
-    """Service for generating and sending therapy session email summaries"""
-    
     def __init__(self):
-        self.smtp_server = "smtp.gmail.com"
-        self.smtp_port = 587
+        self.sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
         
-    def generate_session_summary(self, transcript_data: Dict, ai_analysis: Dict) -> Dict:
-        """Generate concise session summary for email review"""
-        
-        client_name = transcript_data.get('client_name', 'Client')
-        session_date = transcript_data.get('session_date', 'Unknown Date')
-        
-        # Extract key information from AI analysis
-        summary_data = self._extract_key_insights(ai_analysis)
-        
-        # Generate follow-up questions
-        follow_up_questions = self._generate_follow_up_questions(summary_data, ai_analysis)
-        
-        # Generate reflection questions for client
-        reflection_questions = self._generate_reflection_questions(summary_data, ai_analysis)
-        
-        # Create concise summary
-        summary = {
-            'client_name': client_name,
-            'session_date': session_date,
-            'session_summary': summary_data['brief_summary'],
-            'key_themes': summary_data['key_themes'],
-            'emotional_state': summary_data['emotional_assessment'],
-            'progress_indicators': summary_data['progress_notes'],
-            'areas_of_focus': summary_data['focus_areas'],
-            'follow_up_questions': follow_up_questions,
-            'reflection_questions': reflection_questions,
-            'next_session_recommendations': self._generate_session_recommendations(summary_data),
-            'generated_at': datetime.now().isoformat()
-        }
-        
-        return summary
-    
-    def _extract_key_insights(self, ai_analysis: Dict) -> Dict:
-        """Extract key insights from comprehensive AI analysis"""
-        
-        insights = {
-            'brief_summary': '',
-            'key_themes': [],
-            'emotional_assessment': '',
-            'progress_notes': '',
-            'focus_areas': []
-        }
-        
-        # Extract from different AI providers
-        for provider in ['openai_analysis', 'anthropic_analysis', 'gemini_analysis']:
-            provider_data = ai_analysis.get(provider, {})
+    def extract_session_summary(self, transcript_data: Dict) -> Dict:
+        """Extract key information from AI analyses to create session summary"""
+        try:
+            # Combine all AI analyses
+            openai_analysis = transcript_data.get('openai_analysis', '')
+            anthropic_analysis = transcript_data.get('anthropic_analysis', '')
+            gemini_analysis = transcript_data.get('gemini_analysis', '')
             
-            if not provider_data:
-                continue
+            # Extract key components using pattern matching
+            summary_data = {
+                'session_overview': self._extract_session_overview(openai_analysis, anthropic_analysis),
+                'key_topics': self._extract_key_topics(openai_analysis, anthropic_analysis, gemini_analysis),
+                'therapeutic_insights': self._extract_therapeutic_insights(openai_analysis, anthropic_analysis),
+                'action_items': self._extract_action_items(openai_analysis, anthropic_analysis, gemini_analysis),
+                'follow_up_questions': self._generate_follow_up_questions(openai_analysis, anthropic_analysis),
+                'next_session_focus': self._identify_next_session_focus(openai_analysis, anthropic_analysis, gemini_analysis),
+                'significant_quotes': self._extract_significant_quotes(openai_analysis, anthropic_analysis),
+                'progress_indicators': self._extract_progress_indicators(openai_analysis, anthropic_analysis, gemini_analysis)
+            }
             
-            # Extract from clinical progress note format
-            if 'clinical_progress_note' in provider_data:
-                content = provider_data['clinical_progress_note']
-                insights.update(self._parse_clinical_content(content))
-                break  # Use first available comprehensive analysis
-        
-        return insights
+            return summary_data
+            
+        except Exception as e:
+            logger.error(f"Error extracting session summary: {str(e)}")
+            return {}
     
-    def _parse_clinical_content(self, content: str) -> Dict:
-        """Parse clinical progress note content for key insights"""
-        
-        parsed = {
-            'brief_summary': '',
-            'key_themes': [],
-            'emotional_assessment': '',
-            'progress_notes': '',
-            'focus_areas': []
-        }
-        
-        if not content:
-            return parsed
-        
-        # Extract brief summary (first paragraph of subjective section)
-        subjective_match = re.search(r'Subjective[:\s]+(.*?)(?=Objective|$)', content, re.DOTALL | re.IGNORECASE)
-        if subjective_match:
-            subjective_text = subjective_match.group(1).strip()
-            # Take first 2-3 sentences
-            sentences = re.split(r'[.!?]+', subjective_text)
-            parsed['brief_summary'] = '. '.join(sentences[:3]).strip() + '.'
-        
-        # Extract emotional assessment from objective section
-        objective_match = re.search(r'Objective[:\s]+(.*?)(?=Assessment|$)', content, re.DOTALL | re.IGNORECASE)
-        if objective_match:
-            objective_text = objective_match.group(1).strip()
-            # Look for emotional/affective descriptions
-            affect_sentences = [s for s in re.split(r'[.!?]+', objective_text) if any(word in s.lower() for word in ['affect', 'mood', 'emotional', 'feeling'])]
-            if affect_sentences:
-                parsed['emotional_assessment'] = affect_sentences[0].strip() + '.'
-        
-        # Extract progress notes from assessment section
-        assessment_match = re.search(r'Assessment[:\s]+(.*?)(?=Plan|$)', content, re.DOTALL | re.IGNORECASE)
-        if assessment_match:
-            assessment_text = assessment_match.group(1).strip()
-            sentences = re.split(r'[.!?]+', assessment_text)
-            parsed['progress_notes'] = '. '.join(sentences[:2]).strip() + '.'
-        
-        # Extract key themes from thematic analysis
-        themes_match = re.search(r'Key Points[:\s]+(.*?)(?=Significant Quotes|$)', content, re.DOTALL | re.IGNORECASE)
-        if themes_match:
-            themes_text = themes_match.group(1).strip()
-            # Extract bullet points or numbered items
-            themes = re.findall(r'[•\-\*]\s*([^•\-\*\n]+)', themes_text)
-            parsed['key_themes'] = [theme.strip() for theme in themes[:5]]
-        
-        # Extract focus areas from plan section
-        plan_match = re.search(r'Plan[:\s]+(.*?)(?=Supplemental|$)', content, re.DOTALL | re.IGNORECASE)
-        if plan_match:
-            plan_text = plan_match.group(1).strip()
-            # Extract action items or focus areas
-            focus_items = re.findall(r'[•\-\*]\s*([^•\-\*\n]+)', plan_text)
-            parsed['focus_areas'] = [item.strip() for item in focus_items[:4]]
-        
-        return parsed
-    
-    def _generate_follow_up_questions(self, summary_data: Dict, ai_analysis: Dict) -> List[str]:
-        """Generate follow-up questions for therapist to explore in next session"""
-        
-        questions = []
-        
-        # Questions based on key themes
-        themes = summary_data.get('key_themes', [])
-        for theme in themes[:2]:  # Limit to top 2 themes
-            if 'relationship' in theme.lower():
-                questions.append(f"How have your relationship patterns evolved since our last discussion about {theme.lower()}?")
-            elif 'anxiety' in theme.lower() or 'stress' in theme.lower():
-                questions.append(f"What specific situations have triggered anxiety for you this week, and how did you respond?")
-            elif 'progress' in theme.lower() or 'improvement' in theme.lower():
-                questions.append(f"What specific changes have you noticed in yourself since we discussed {theme.lower()}?")
-            else:
-                questions.append(f"Tell me more about how {theme.lower()} has been affecting you since our last session.")
-        
-        # Questions based on emotional state
-        emotional_state = summary_data.get('emotional_assessment', '').lower()
-        if 'anxious' in emotional_state or 'nervous' in emotional_state:
-            questions.append("What has been your experience with the coping strategies we discussed for managing anxiety?")
-        elif 'sad' in emotional_state or 'depressed' in emotional_state:
-            questions.append("How has your mood been this week, and what moments stood out as particularly difficult or encouraging?")
-        elif 'anger' in emotional_state or 'frustrated' in emotional_state:
-            questions.append("Have you encountered situations that triggered anger or frustration, and how did you handle them?")
-        
-        # Questions based on progress areas
-        focus_areas = summary_data.get('focus_areas', [])
-        for area in focus_areas[:2]:
-            if 'homework' in area.lower() or 'assignment' in area.lower():
-                questions.append("How did you find completing the therapeutic exercises we discussed?")
-            elif 'coping' in area.lower() or 'skill' in area.lower():
-                questions.append("Which coping strategies have you found most helpful, and which have been challenging to implement?")
-        
-        # Ensure minimum number of questions
-        if len(questions) < 3:
-            questions.extend([
-                "What has been on your mind most since our last session?",
-                "Have you noticed any patterns in your thoughts or behaviors this week?",
-                "What would you like to focus on in today's session?"
-            ])
-        
-        return questions[:5]  # Limit to 5 questions
-    
-    def _generate_reflection_questions(self, summary_data: Dict, ai_analysis: Dict) -> List[str]:
-        """Generate reflection questions for client to consider before next session"""
-        
-        questions = []
-        
-        # General reflection questions
-        base_questions = [
-            "What emotions have you experienced most frequently since our last session?",
-            "What situations or interactions this week felt most challenging for you?",
-            "When did you feel most like yourself this week?",
-            "What patterns have you noticed in your thoughts or reactions?",
-            "What would you like to work on or explore in our next session?"
+    def _extract_session_overview(self, openai_analysis: str, anthropic_analysis: str) -> str:
+        """Extract concise session overview"""
+        # Look for subjective or assessment sections
+        patterns = [
+            r'SUBJECTIVE\s*(.{200,800}?)(?=OBJECTIVE|ASSESSMENT|$)',
+            r'Session Overview\s*(.{200,600}?)(?=\n\n|\n[A-Z])',
+            r'COMPREHENSIVE NARRATIVE SUMMARY\s*(.{200,800}?)(?=\n\n|$)'
         ]
         
-        # Customized questions based on themes
-        themes = summary_data.get('key_themes', [])
-        for theme in themes[:2]:
-            if 'relationship' in theme.lower():
-                questions.append("How have your interactions with important people in your life felt this week?")
-            elif 'work' in theme.lower() or 'career' in theme.lower():
-                questions.append("What aspects of your work or career have been most prominent in your thoughts?")
-            elif 'family' in theme.lower():
-                questions.append("How have your family relationships or dynamics affected you this week?")
+        for pattern in patterns:
+            for analysis in [openai_analysis, anthropic_analysis]:
+                if analysis:
+                    match = re.search(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                    if match:
+                        overview = match.group(1).strip()
+                        # Clean up and truncate
+                        overview = re.sub(r'\s+', ' ', overview)
+                        return overview[:400] + "..." if len(overview) > 400 else overview
         
-        # Combine and limit
-        all_questions = questions + base_questions
-        return all_questions[:6]  # Limit to 6 reflection questions
+        return "Session focused on therapeutic progress and client concerns."
     
-    def _generate_session_recommendations(self, summary_data: Dict) -> List[str]:
-        """Generate recommendations for next session focus"""
+    def _extract_key_topics(self, openai_analysis: str, anthropic_analysis: str, gemini_analysis: str) -> List[str]:
+        """Extract key topics discussed in session"""
+        topics = []
         
-        recommendations = []
+        # Look for thematic analysis sections
+        patterns = [
+            r'Thematic Analysis.*?(?=\n\n|[A-Z]{2,})',
+            r'KEY POINTS\s*(.*?)(?=\n\n|[A-Z]{2,})',
+            r'Major themes.*?(?=\n\n|[A-Z]{2,})'
+        ]
         
-        # Based on focus areas
-        focus_areas = summary_data.get('focus_areas', [])
-        for area in focus_areas[:3]:
-            if 'EMDR' in area or 'trauma' in area.lower():
-                recommendations.append("Continue EMDR therapy to address identified trauma responses")
-            elif 'coping' in area.lower():
-                recommendations.append("Review and practice coping strategies, introduce new techniques as needed")
-            elif 'family' in area.lower():
-                recommendations.append("Explore family dynamics and their impact on current emotional state")
-            else:
-                recommendations.append(f"Follow up on {area.lower()}")
+        for analysis in [openai_analysis, anthropic_analysis, gemini_analysis]:
+            if analysis:
+                for pattern in patterns:
+                    matches = re.findall(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                    for match in matches:
+                        # Extract bullet points or numbered items
+                        topic_items = re.findall(r'[•\-\*]\s*([^\n]{20,150})', match)
+                        topics.extend(topic_items[:3])  # Limit to top 3 per analysis
         
-        # General recommendations
-        if len(recommendations) < 2:
-            recommendations.extend([
-                "Review progress since last session and adjust treatment goals",
-                "Continue building therapeutic alliance and exploring client's current needs"
-            ])
+        # Remove duplicates and clean up
+        unique_topics = []
+        for topic in topics:
+            clean_topic = re.sub(r'\s+', ' ', topic.strip())
+            if clean_topic not in unique_topics and len(clean_topic) > 10:
+                unique_topics.append(clean_topic)
         
-        return recommendations[:4]  # Limit to 4 recommendations
+        return unique_topics[:6]  # Return top 6 topics
     
-    def format_email_summary(self, summary_data: Dict) -> str:
-        """Format summary data into readable email content"""
+    def _extract_therapeutic_insights(self, openai_analysis: str, anthropic_analysis: str) -> List[str]:
+        """Extract key therapeutic insights and interventions"""
+        insights = []
         
-        client_name = summary_data.get('client_name', 'Client')
-        session_date = summary_data.get('session_date', 'Unknown Date')
+        patterns = [
+            r'ASSESSMENT\s*(.{100,500}?)(?=PLAN|$)',
+            r'therapeutic.*?insights?\s*(.{100,400}?)(?=\n\n|[A-Z]{2,})',
+            r'Clinical.*?observations?\s*(.{100,400}?)(?=\n\n|[A-Z]{2,})'
+        ]
         
-        email_content = f"""
+        for analysis in [openai_analysis, anthropic_analysis]:
+            if analysis:
+                for pattern in patterns:
+                    match = re.search(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                    if match:
+                        insight = match.group(1).strip()
+                        insight = re.sub(r'\s+', ' ', insight)
+                        if len(insight) > 50:
+                            insights.append(insight[:200])
+        
+        return insights[:3]
+    
+    def _extract_action_items(self, openai_analysis: str, anthropic_analysis: str, gemini_analysis: str) -> List[str]:
+        """Extract specific action items and homework assignments"""
+        action_items = []
+        
+        patterns = [
+            r'PLAN\s*(.*?)(?=\n\n|[A-Z]{2,}|$)',
+            r'homework.*?assignments?\s*(.*?)(?=\n\n|[A-Z]{2,})',
+            r'action.*?items?\s*(.*?)(?=\n\n|[A-Z]{2,})',
+            r'follow-?up.*?appointments?\s*(.*?)(?=\n\n|[A-Z]{2,})'
+        ]
+        
+        for analysis in [openai_analysis, anthropic_analysis, gemini_analysis]:
+            if analysis:
+                for pattern in patterns:
+                    matches = re.findall(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                    for match in matches:
+                        # Extract specific actionable items
+                        items = re.findall(r'[•\-\*]\s*([^\n]{20,200})', match)
+                        action_items.extend(items)
+        
+        # Clean and deduplicate
+        unique_actions = []
+        for item in action_items:
+            clean_item = re.sub(r'\s+', ' ', item.strip())
+            if clean_item not in unique_actions and len(clean_item) > 15:
+                unique_actions.append(clean_item)
+        
+        return unique_actions[:5]
+    
+    def _generate_follow_up_questions(self, openai_analysis: str, anthropic_analysis: str) -> List[str]:
+        """Generate follow-up questions for next session"""
+        questions = []
+        
+        # Look for areas that need exploration
+        patterns = [
+            r'explore.*?further\s*(.{50,200}?)(?=\.|,|\n)',
+            r'follow.*?up.*?on\s*(.{50,200}?)(?=\.|,|\n)',
+            r'monitor.*?progress\s*(.{50,200}?)(?=\.|,|\n)'
+        ]
+        
+        base_questions = [
+            "How have you been feeling since our last session?",
+            "What progress have you noticed with the strategies we discussed?",
+            "Are there any new concerns or challenges that have come up?",
+            "How effective were the coping techniques we practiced?"
+        ]
+        
+        for analysis in [openai_analysis, anthropic_analysis]:
+            if analysis:
+                for pattern in patterns:
+                    matches = re.findall(pattern, analysis, re.IGNORECASE)
+                    for match in matches:
+                        question = f"How has {match.strip().lower()} been progressing?"
+                        if question not in questions:
+                            questions.append(question)
+        
+        # Combine with base questions
+        all_questions = base_questions + questions
+        return all_questions[:6]
+    
+    def _identify_next_session_focus(self, openai_analysis: str, anthropic_analysis: str, gemini_analysis: str) -> List[str]:
+        """Identify key focus areas for next session"""
+        focus_areas = []
+        
+        patterns = [
+            r'next.*?session.*?focus\s*(.{50,300}?)(?=\n\n|[A-Z]{2,})',
+            r'continue.*?working.*?on\s*(.{50,200}?)(?=\.|,|\n)',
+            r'areas.*?requiring.*?attention\s*(.{50,200}?)(?=\.|,|\n)'
+        ]
+        
+        for analysis in [openai_analysis, anthropic_analysis, gemini_analysis]:
+            if analysis:
+                for pattern in patterns:
+                    matches = re.findall(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                    focus_areas.extend(matches)
+        
+        # Clean and format
+        cleaned_focus = []
+        for area in focus_areas:
+            clean_area = re.sub(r'\s+', ' ', area.strip())
+            if len(clean_area) > 20 and clean_area not in cleaned_focus:
+                cleaned_focus.append(clean_area)
+        
+        return cleaned_focus[:4]
+    
+    def _extract_significant_quotes(self, openai_analysis: str, anthropic_analysis: str) -> List[str]:
+        """Extract significant client quotes"""
+        quotes = []
+        
+        patterns = [
+            r'"([^"]{30,200})"',
+            r'SIGNIFICANT QUOTES\s*(.*?)(?=\n\n|[A-Z]{2,})'
+        ]
+        
+        for analysis in [openai_analysis, anthropic_analysis]:
+            if analysis:
+                for pattern in patterns:
+                    matches = re.findall(pattern, analysis, re.DOTALL)
+                    for match in matches:
+                        if isinstance(match, str) and len(match) > 30:
+                            quotes.append(match.strip())
+        
+        return quotes[:3]
+    
+    def _extract_progress_indicators(self, openai_analysis: str, anthropic_analysis: str, gemini_analysis: str) -> List[str]:
+        """Extract progress indicators and improvements"""
+        indicators = []
+        
+        patterns = [
+            r'progress.*?noted\s*(.{50,200}?)(?=\.|,|\n)',
+            r'improvement.*?in\s*(.{50,200}?)(?=\.|,|\n)',
+            r'positive.*?changes?\s*(.{50,200}?)(?=\.|,|\n)'
+        ]
+        
+        for analysis in [openai_analysis, anthropic_analysis, gemini_analysis]:
+            if analysis:
+                for pattern in patterns:
+                    matches = re.findall(pattern, analysis, re.IGNORECASE)
+                    indicators.extend(matches)
+        
+        return [ind.strip() for ind in indicators[:4] if len(ind.strip()) > 20]
+    
+    def generate_email_content(self, client_name: str, session_date: str, summary_data: Dict) -> Dict:
+        """Generate formatted email content"""
+        
+        subject = f"Therapy Session Summary - {client_name} - {session_date}"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #2c5aa0; border-bottom: 2px solid #2c5aa0; padding-bottom: 10px;">
+                    Therapy Session Summary
+                </h1>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #2c5aa0;">Session Details</h3>
+                    <p><strong>Client:</strong> {client_name}</p>
+                    <p><strong>Date:</strong> {session_date}</p>
+                    <p><strong>Generated:</strong> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+                </div>
+                
+                <h3 style="color: #2c5aa0;">Session Overview</h3>
+                <p style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #2c5aa0;">
+                    {summary_data.get('session_overview', 'No overview available')}
+                </p>
+                
+                <h3 style="color: #2c5aa0;">Key Topics Discussed</h3>
+                <ul>
+        """
+        
+        for topic in summary_data.get('key_topics', []):
+            html_content += f"<li>{topic}</li>"
+        
+        html_content += """
+                </ul>
+                
+                <h3 style="color: #2c5aa0;">Therapeutic Insights</h3>
+                <ul>
+        """
+        
+        for insight in summary_data.get('therapeutic_insights', []):
+            html_content += f"<li>{insight}</li>"
+        
+        html_content += """
+                </ul>
+                
+                <h3 style="color: #2c5aa0;">Action Items & Homework</h3>
+                <ul>
+        """
+        
+        for action in summary_data.get('action_items', []):
+            html_content += f"<li>{action}</li>"
+        
+        html_content += """
+                </ul>
+                
+                <h3 style="color: #2c5aa0;">Next Session Focus Questions</h3>
+                <ol>
+        """
+        
+        for question in summary_data.get('follow_up_questions', []):
+            html_content += f"<li>{question}</li>"
+        
+        html_content += """
+                </ol>
+                
+                <h3 style="color: #2c5aa0;">Areas for Next Session</h3>
+                <ul>
+        """
+        
+        for focus in summary_data.get('next_session_focus', []):
+            html_content += f"<li>{focus}</li>"
+        
+        if summary_data.get('significant_quotes'):
+            html_content += """
+                </ul>
+                
+                <h3 style="color: #2c5aa0;">Significant Client Statements</h3>
+                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px;">
+            """
+            for quote in summary_data.get('significant_quotes', []):
+                html_content += f'<p style="font-style: italic; margin: 10px 0;">"{quote}"</p>'
+            html_content += "</div>"
+        
+        if summary_data.get('progress_indicators'):
+            html_content += """
+                <h3 style="color: #2c5aa0;">Progress Indicators</h3>
+                <ul style="color: #28a745;">
+            """
+            for indicator in summary_data.get('progress_indicators', []):
+                html_content += f"<li>{indicator}</li>"
+            html_content += "</ul>"
+        
+        html_content += """
+                <div style="margin-top: 30px; padding: 15px; background-color: #e7f3ff; border-radius: 5px;">
+                    <p style="margin: 0; font-size: 12px; color: #666;">
+                        This summary was automatically generated from AI analysis of the therapy session transcript. 
+                        Please review for accuracy and supplement with your clinical observations as needed.
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Generate plain text version
+        text_content = f"""
 THERAPY SESSION SUMMARY
-Client: {client_name}
-Session Date: {session_date}
-Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
-═══════════════════════════════════════════
+Client: {client_name}
+Date: {session_date}
+Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
 
 SESSION OVERVIEW
-{summary_data.get('session_summary', 'No summary available')}
+{summary_data.get('session_overview', 'No overview available')}
 
-EMOTIONAL STATE
-{summary_data.get('emotional_state', 'No emotional assessment available')}
-
-KEY THEMES ADDRESSED
+KEY TOPICS DISCUSSED
 """
         
-        themes = summary_data.get('key_themes', [])
-        if themes:
-            for i, theme in enumerate(themes, 1):
-                email_content += f"{i}. {theme}\n"
-        else:
-            email_content += "No specific themes identified\n"
+        for i, topic in enumerate(summary_data.get('key_topics', []), 1):
+            text_content += f"{i}. {topic}\n"
         
-        email_content += f"""
-PROGRESS NOTES
-{summary_data.get('progress_indicators', 'No progress notes available')}
-
-AREAS OF FOCUS
-"""
+        text_content += "\nTHERAPEUTIC INSIGHTS\n"
+        for i, insight in enumerate(summary_data.get('therapeutic_insights', []), 1):
+            text_content += f"{i}. {insight}\n"
         
-        focus_areas = summary_data.get('areas_of_focus', [])
-        if focus_areas:
-            for i, area in enumerate(focus_areas, 1):
-                email_content += f"{i}. {area}\n"
-        else:
-            email_content += "No specific focus areas identified\n"
+        text_content += "\nACTION ITEMS & HOMEWORK\n"
+        for i, action in enumerate(summary_data.get('action_items', []), 1):
+            text_content += f"{i}. {action}\n"
         
-        email_content += "\n" + "="*50 + "\n"
-        email_content += "FOLLOW-UP QUESTIONS FOR NEXT SESSION\n"
-        email_content += "="*50 + "\n\n"
+        text_content += "\nNEXT SESSION FOCUS QUESTIONS\n"
+        for i, question in enumerate(summary_data.get('follow_up_questions', []), 1):
+            text_content += f"{i}. {question}\n"
         
-        follow_ups = summary_data.get('follow_up_questions', [])
-        for i, question in enumerate(follow_ups, 1):
-            email_content += f"{i}. {question}\n\n"
+        text_content += "\nAREAS FOR NEXT SESSION\n"
+        for i, focus in enumerate(summary_data.get('next_session_focus', []), 1):
+            text_content += f"{i}. {focus}\n"
         
-        email_content += "\n" + "="*50 + "\n"
-        email_content += "REFLECTION QUESTIONS FOR CLIENT\n"
-        email_content += "="*50 + "\n\n"
+        if summary_data.get('significant_quotes'):
+            text_content += "\nSIGNIFICANT CLIENT STATEMENTS\n"
+            for quote in summary_data.get('significant_quotes', []):
+                text_content += f'- "{quote}"\n'
         
-        reflections = summary_data.get('reflection_questions', [])
-        for i, question in enumerate(reflections, 1):
-            email_content += f"{i}. {question}\n\n"
+        if summary_data.get('progress_indicators'):
+            text_content += "\nPROGRESS INDICATORS\n"
+            for indicator in summary_data.get('progress_indicators', []):
+                text_content += f"- {indicator}\n"
         
-        email_content += "\n" + "="*50 + "\n"
-        email_content += "NEXT SESSION RECOMMENDATIONS\n"
-        email_content += "="*50 + "\n\n"
+        text_content += "\n---\nThis summary was automatically generated from AI analysis of the therapy session transcript."
         
-        recommendations = summary_data.get('next_session_recommendations', [])
-        for i, rec in enumerate(recommendations, 1):
-            email_content += f"{i}. {rec}\n"
-        
-        email_content += f"""
-
-═══════════════════════════════════════════
-This summary was automatically generated from comprehensive therapy session analysis.
-Please review before next session to inform treatment planning and session focus.
-═══════════════════════════════════════════
-"""
-        
-        return email_content
+        return {
+            'subject': subject,
+            'html_content': html_content,
+            'text_content': text_content
+        }
     
-    def send_email_summary(self, summary_data: Dict, recipient_email: str, smtp_username: str, smtp_password: str) -> bool:
-        """Send email summary to specified recipient"""
-        
+    def send_summary_email(self, recipient_email: str, email_content: Dict) -> bool:
+        """Send the summary email using SendGrid"""
         try:
-            # Format email content
-            email_body = self.format_email_summary(summary_data)
+            if not self.sendgrid_api_key:
+                logger.error("SendGrid API key not configured")
+                return False
             
-            # Create email message
-            msg = MIMEMultipart()
-            msg['From'] = smtp_username
-            msg['To'] = recipient_email
-            msg['Subject'] = f"Session Summary: {summary_data.get('client_name', 'Client')} - {summary_data.get('session_date', 'Date Unknown')}"
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail, Email, To, Content
             
-            # Attach body
-            msg.attach(MIMEText(email_body, 'plain'))
+            sg = SendGridAPIClient(self.sendgrid_api_key)
             
-            # Send email
-            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-            server.starttls()
-            server.login(smtp_username, smtp_password)
+            message = Mail(
+                from_email=Email("noreply@therapynotes.com", "Therapy Notes System"),
+                to_emails=To(recipient_email),
+                subject=email_content['subject']
+            )
             
-            text = msg.as_string()
-            server.sendmail(smtp_username, recipient_email, text)
-            server.quit()
+            # Add both HTML and text content
+            message.content = [
+                Content("text/plain", email_content['text_content']),
+                Content("text/html", email_content['html_content'])
+            ]
             
-            logger.info(f"Email summary sent successfully to {recipient_email}")
-            return True
+            response = sg.send(message)
             
+            if response.status_code in [200, 202]:
+                logger.info(f"Summary email sent successfully to {recipient_email}")
+                return True
+            else:
+                logger.error(f"Failed to send email. Status code: {response.status_code}")
+                return False
+                
         except Exception as e:
-            logger.error(f"Failed to send email summary: {str(e)}")
+            logger.error(f"Error sending summary email: {str(e)}")
             return False
     
-    def create_summary_for_transcript(self, transcript_id: int) -> Optional[Dict]:
-        """Create summary for a specific transcript ID"""
-        
+    def process_and_send_summary(self, transcript_data: Dict, recipient_email: str) -> bool:
+        """Complete process: extract summary and send email"""
         try:
-            from models import Transcript
-            from app import db
+            # Extract session summary
+            summary_data = self.extract_session_summary(transcript_data)
             
-            # Get transcript data
-            transcript = db.session.get(Transcript, transcript_id)
-            if not transcript:
-                logger.error(f"Transcript {transcript_id} not found")
-                return None
+            # Generate email content
+            client_name = transcript_data.get('client_name', 'Unknown Client')
+            session_date = transcript_data.get('session_date', 'Unknown Date')
             
-            # Prepare transcript data
-            transcript_data = {
-                'client_name': transcript.client.name if transcript.client else 'Unknown Client',
-                'session_date': transcript.session_date.isoformat() if transcript.session_date else 'Unknown Date',
-                'raw_content': transcript.raw_content
-            }
+            email_content = self.generate_email_content(client_name, session_date, summary_data)
             
-            # Prepare AI analysis data
-            ai_analysis = {
-                'openai_analysis': transcript.openai_analysis,
-                'anthropic_analysis': transcript.anthropic_analysis,
-                'gemini_analysis': transcript.gemini_analysis
-            }
-            
-            # Generate summary
-            summary = self.generate_session_summary(transcript_data, ai_analysis)
-            
-            return summary
+            # Send email
+            return self.send_summary_email(recipient_email, email_content)
             
         except Exception as e:
-            logger.error(f"Error creating summary for transcript {transcript_id}: {str(e)}")
-            return None
+            logger.error(f"Error in process_and_send_summary: {str(e)}")
+            return False

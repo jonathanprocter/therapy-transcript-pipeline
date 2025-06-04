@@ -720,64 +720,53 @@ def adaptive_color_ui(transcript_id):
         flash(f"Error loading adaptive interface: {str(e)}", 'error')
         return redirect(url_for('transcript_detail', transcript_id=transcript_id))
 
-@app.route('/transcript/<int:transcript_id>/email-summary', methods=['GET', 'POST'])
-def email_summary(transcript_id):
-    """Generate and send email summary for session review"""
+@app.route('/send_email_summary/<int:transcript_id>', methods=['POST'])
+def send_email_summary(transcript_id):
+    """One-button email export for therapy session summaries"""
     try:
         transcript = db.session.get(Transcript, transcript_id)
         if not transcript:
             flash('Transcript not found', 'error')
             return redirect(url_for('dashboard'))
 
-        if request.method == 'POST':
-            recipient_email = request.form.get('recipient_email')
-            smtp_username = request.form.get('smtp_username')
-            smtp_password = request.form.get('smtp_password')
+        # Get recipient email from form
+        recipient_email = request.form.get('recipient_email')
+        if not recipient_email:
+            flash('Recipient email is required', 'error')
+            return redirect(url_for('client_details', client_id=transcript.client_id))
 
-            if not all([recipient_email, smtp_username, smtp_password]):
-                flash('All email fields are required', 'error')
-                return redirect(url_for('email_summary', transcript_id=transcript_id))
+        # Check if SendGrid API key is available
+        if not os.environ.get('SENDGRID_API_KEY'):
+            flash('Email service not configured. Please contact administrator.', 'error')
+            return redirect(url_for('client_details', client_id=transcript.client_id))
 
-            # Generate email summary
-            if email_summary_service:
-                summary_data = email_summary_service.create_summary_for_transcript(transcript_id)
+        # Initialize email summary service
+        from services.email_summary_service import EmailSummaryService
+        email_service = EmailSummaryService()
 
-                if summary_data:
-                    # Send email
-                    success = email_summary_service.send_email_summary(
-                        summary_data, recipient_email, smtp_username, smtp_password
-                    )
+        # Prepare transcript data for summary generation
+        transcript_data = {
+            'client_name': transcript.client.name,
+            'session_date': transcript.session_date.strftime('%B %d, %Y') if transcript.session_date else 'Unknown Date',
+            'original_filename': transcript.original_filename,
+            'openai_analysis': transcript.openai_analysis,
+            'anthropic_analysis': transcript.anthropic_analysis,
+            'gemini_analysis': transcript.gemini_analysis
+        }
 
-                    if success:
-                        flash('Email summary sent successfully', 'success')
-                    else:
-                        flash('Failed to send email summary', 'error')
-                else:
-                    flash('Failed to generate email summary', 'error')
-            else:
-                flash('Email service unavailable', 'error')
+        # Generate and send email summary
+        success = email_service.process_and_send_summary(transcript_data, recipient_email)
 
-            return redirect(url_for('transcript_detail', transcript_id=transcript_id))
-
-        # GET request - show email form with preview
-        if email_summary_service:
-            summary_data = email_summary_service.create_summary_for_transcript(transcript_id)
-            if summary_data:
-                email_preview = email_summary_service.format_email_summary(summary_data)
-            else:
-                email_preview = "Unable to generate email preview"
+        if success:
+            flash(f'Session summary emailed successfully to {recipient_email}', 'success')
         else:
-            summary_data = None
-            email_preview = "Email service unavailable"
+            flash('Failed to send email summary. Please check email configuration.', 'error')
 
-        return render_template('email_summary.html', 
-                             transcript=transcript,
-                             email_preview=email_preview,
-                             summary_data=summary_data)
+        return redirect(url_for('client_details', client_id=transcript.client_id))
 
     except Exception as e:
-        logger.error(f"Error with email summary: {str(e)}")
-        flash(f"Error with email summary: {str(e)}", 'error')
+        logger.error(f"Error sending email summary: {str(e)}")
+        flash(f"Error sending email summary: {str(e)}", 'error')
         return redirect(url_for('transcript_detail', transcript_id=transcript_id))
 
 @app.route('/client/<int:client_id>')
