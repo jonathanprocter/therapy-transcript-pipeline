@@ -21,7 +21,7 @@ class DropboxService:
 
             self.access_token = os.environ.get('DROPBOX_ACCESS_TOKEN') or Config.DROPBOX_ACCESS_TOKEN
             self.monitor_folder = getattr(Config, 'DROPBOX_MONITOR_FOLDER', '/apps/otter')
-            
+
             logger.info(f"Initializing Dropbox service with folder: {self.monitor_folder}")
 
             if not self.access_token or self.access_token.startswith('your_'):
@@ -69,12 +69,12 @@ class DropboxService:
         if not self.client:
             logger.error("Dropbox client not initialized")
             return []
-            
+
         if folder_path is None:
             folder_path = self.monitor_folder
 
         logger.info(f"Listing files in folder: {folder_path}")
-        
+
         # Try to validate/create the folder path first
         folder_path = self._validate_folder_path(folder_path)
         if folder_path is None:
@@ -217,42 +217,47 @@ class DropboxService:
         return True
 
     def _validate_folder_path(self, folder_path: str) -> str:
-        """Validate and fix folder path if needed"""
-        if not folder_path:
-            logger.info("No folder path provided, trying default paths")
-            folder_path = "/apps/otter"
-        
+        """Validate and find the correct folder path"""
         logger.info(f"Attempting to validate folder path: {folder_path}")
-        
-        # Common path variations to try
-        paths_to_try = [
-            folder_path,
-            folder_path.replace("/apps/otter", "/Apps/Otter"),
-            folder_path.replace("/apps/otter", "/apps/Otter"),
-            "/Apps/Otter",
-            "/apps/otter",
-            ""  # Root folder
+
+        # If it's already working, return it
+        if folder_path and hasattr(self, '_validated_folder'):
+            return self._validated_folder
+
+        # List of possible folder variations to try
+        folder_variations = [
+            folder_path,  # Try original first
+            '/Apps/Otter',  # Capital A in Apps, capital O in Otter
+            '/apps/Otter',  # lowercase apps, capital O in Otter  
+            '/Apps/otter',  # Capital A in Apps, lowercase otter
+            '/apps/otter',  # All lowercase
+            '/Otter',       # Just Otter folder in root
+            '/otter',       # Just otter folder in root
+            ''              # Root folder as fallback
         ]
-        
-        for path in paths_to_try:
+
+        for variation in folder_variations:
             try:
-                logger.info(f"Trying folder path: '{path}'")
-                self.client.files_list_folder(path)
-                logger.info(f"Valid folder path found: '{path}'")
-                return path
+                logger.info(f"Trying folder path: '{variation}'")
+                result = self.client.files_list_folder(variation)
+                logger.info(f"Valid folder path found: '{variation}'")
+                self._validated_folder = variation
+                return variation
             except dropbox.exceptions.ApiError as e:
-                logger.debug(f"Path '{path}' failed: {str(e)}")
+                logger.debug(f"Folder '{variation}' not accessible: {str(e)}")
                 continue
-                
-        logger.warning("No valid folder path found, will use root folder")
-        return ""
-    
+
+        # If no valid folder found, return empty string (root)
+        logger.warning(f"No valid folder path found for '{folder_path}', using root folder")
+        self._validated_folder = ''
+        return ''
+
     def _list_files_fallback(self) -> List[Dict]:
         """Fallback method to list files from root folder"""
         try:
             files = []
             result = self.client.files_list_folder("")
-            
+
             for entry in result.entries:
                 if isinstance(entry, dropbox.files.FileMetadata):
                     file_ext = os.path.splitext(entry.name)[1].lower()
@@ -264,10 +269,10 @@ class DropboxService:
                             'modified': entry.client_modified,
                             'content_hash': entry.content_hash
                         })
-            
+
             logger.info(f"Found {len(files)} supported files in root folder")
             return files
-            
+
         except Exception as e:
             logger.error(f"Error in fallback file listing: {str(e)}")
             return []

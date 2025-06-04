@@ -377,51 +377,60 @@
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
 // Create client form handler
-document.getElementById('createClientForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+document.addEventListener('DOMContentLoaded', function() {
+    // Client form submission
+    const createClientForm = document.getElementById('createClientForm');
+    if (createClientForm) {
+        createClientForm.addEventListener('submit', function(e) {
+            e.preventDefault();
 
-    const formData = new FormData(this);
-    const clientData = {
-        name: formData.get('name').trim()
-    };
+            const formData = new FormData(this);
+            const clientData = {
+                name: formData.get('name').trim()
+            };
 
-    if (!clientData.name) {
-        showAlert('Please enter a client name', 'danger');
-        return;
+            if (!clientData.name) {
+                if (window.showAlert) {
+                    window.showAlert('Please enter a client name', 'danger');
+                }
+                return;
+            }
+
+            if (window.showLoading) window.showLoading();
+
+            fetch('/api/create-client', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(clientData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (window.hideLoading) window.hideLoading();
+
+                if (data.error) {
+                    if (window.showAlert) window.showAlert('Error: ' + data.error, 'danger');
+                } else {
+                    if (window.showAlert) window.showAlert(data.message, 'success');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createClientModal'));
+                    if (modal) modal.hide();
+                    this.reset();
+
+                    // Refresh page after short delay
+                    setTimeout(() => location.reload(), 1500);
+                }
+            })
+            .catch(error => {
+                if (window.hideLoading) window.hideLoading();
+                if (window.showAlert) window.showAlert('Error: ' + error.message, 'danger');
+            });
+        });
     }
-
-    showLoading();
-
-    fetch('/api/create-client', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(clientData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-
-        if (data.error) {
-            showAlert('Error: ' + data.error, 'danger');
-        } else {
-            showAlert(data.message, 'success');
-            bootstrap.Modal.getInstance(document.getElementById('createClientModal')).hide();
-            document.getElementById('createClientForm').reset();
-
-            // Refresh page after short delay
-            setTimeout(() => location.reload(), 1500);
-        }
-    })
-    .catch(error => {
-        hideLoading();
-        showAlert('Error: ' + error.message, 'danger');
-    });
 });
 
-// Generate longitudinal analysis
-function generateLongitudinalAnalysis(clientId) {
+// Global functions for template use
+window.generateLongitudinalAnalysis = function(clientId) {
     const modal = new bootstrap.Modal(document.getElementById('longitudinalModal'));
     modal.show();
 
@@ -457,7 +466,7 @@ function generateLongitudinalAnalysis(clientId) {
             </div>
         `;
     });
-}
+};
 
 function displayLongitudinalResults(data) {
     let html = '<div class="row">';
@@ -550,85 +559,6 @@ function displayLongitudinalResults(data) {
     html += '</div>';
 
     document.getElementById('longitudinalContent').innerHTML = html;
-}
-
-// Load processing logs
-function loadProcessingLogs() {
-    fetch('/api/processing-logs')
-    .then(response => response.json())
-    .then(data => {
-        if (Array.isArray(data)) {
-            // Update the activity feed
-            const activityFeed = document.querySelector('.activity-feed');
-            if (activityFeed) {
-                let html = '';
-                data.slice(0, 10).forEach(log => {
-                    const icon = log.status === 'success' ? 'fas fa-check-circle text-success' :
-                                log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
-                                'fas fa-info-circle text-info';
-
-                    const date = new Date(log.created_at).toLocaleString();
-
-                    html += `
-                        <div class="activity-item mb-3 pb-3 border-bottom">
-                            <div class="d-flex align-items-start">
-                                <div class="activity-icon me-3">
-                                    <i class="${icon}"></i>
-                                </div>
-                                <div class="activity-content flex-grow-1">
-                                    <div class="activity-message">${log.message}</div>
-                                    <div class="activity-meta text-muted small">
-                                        <i class="fas fa-clock me-1"></i>${date}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                activityFeed.innerHTML = html || '<div class="text-center py-4"><i class="fas fa-history fa-2x text-muted mb-2"></i><p class="text-muted mb-0">No recent activity</p></div>';
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error loading processing logs:', error);
-    });
-}
-
-// Auto-refresh activity feed every 30 seconds
-setInterval(loadProcessingLogs, 30000);
-
-function triggerManualScan() {
-    const newFilesCountSpan = document.getElementById('newFilesCount');
-    const manualScanBtn = document.getElementById('manualScanBtn');
-
-    newFilesCountSpan.textContent = 'Scanning...';
-    newFilesCountSpan.className = 'badge bg-warning';
-    manualScanBtn.disabled = true;
-
-    fetch('/api/scan-dropbox', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        manualScanBtn.disabled = false;
-        if (data.new_files_count !== undefined) {
-            newFilesCountSpan.textContent = `${data.new_files_count} new files detected`;
-            newFilesCountSpan.className = 'badge bg-success';
-        } else {
-            newFilesCountSpan.textContent = 'Scan completed';
-            newFilesCountSpan.className = 'badge bg-info';
-        }
-    })
-    .catch(error => {
-        console.error('Error during manual scan:', error);
-        newFilesCountSpan.textContent = 'Scan failed';
-        newFilesCountSpan.className = 'badge bg-danger';
-        manualScanBtn.disabled = false;
-    });
 }
 </script>
 {% endblock %}

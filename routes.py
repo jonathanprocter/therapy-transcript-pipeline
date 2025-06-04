@@ -384,7 +384,29 @@ def get_processing_logs():
 def scan_dropbox():
     """Alternative endpoint for Dropbox scanning"""
     try:
-        return manual_scan()
+        if not dropbox_service:
+            return jsonify({'error': 'Dropbox service not available'}), 503
+
+        # Get list of already processed files
+        try:
+            processed_files = [t.dropbox_path for t in db.session.query(Transcript).all() if t.dropbox_path]
+        except Exception as e:
+            logger.error(f"Error getting processed files: {str(e)}")
+            processed_files = []
+
+        # Scan for new files
+        new_files = dropbox_service.scan_for_new_files(processed_files)
+
+        if new_files is None:
+            new_files = []
+
+        return jsonify({
+            'success': True,
+            'message': f'Scan completed. Found {len(new_files)} new files.',
+            'new_files_count': len(new_files),
+            'new_files': [f.get('name', 'Unknown') for f in new_files] if new_files else []
+        })
+
     except Exception as e:
         logger.error(f"Error in scan-dropbox endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500

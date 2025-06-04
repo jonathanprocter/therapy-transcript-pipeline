@@ -1,11 +1,14 @@
 // Dashboard utilities and functionality
-console.log('Dashboard utilities loaded successfully');
-
-// Prevent multiple initializations
-if (window.dashboardInitialized) {
-    console.log('Dashboard already initialized, skipping...');
-} else {
+(function() {
+    'use strict';
+    
+    // Prevent multiple initializations
+    if (window.dashboardInitialized) {
+        return;
+    }
     window.dashboardInitialized = true;
+    
+    console.log('Dashboard utilities loaded successfully');
 
     // Initialize dashboard when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
@@ -13,11 +16,14 @@ if (window.dashboardInitialized) {
         loadSystemStats();
         loadServiceStatus();
 
-        // Refresh stats every 30 seconds
-        setInterval(loadSystemStats, 30000);
-        setInterval(loadServiceStatus, 60000);
+        // Refresh stats every 30 seconds (only set once)
+        if (!window.dashboardIntervals) {
+            window.dashboardIntervals = true;
+            setInterval(loadSystemStats, 30000);
+            setInterval(loadServiceStatus, 60000);
+        }
     });
-}
+})();
 
 // Load and display system statistics
 function loadSystemStats() {
