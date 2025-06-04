@@ -5,7 +5,7 @@ class Config:
 
     # Dropbox configuration
     DROPBOX_ACCESS_TOKEN = os.environ.get('DROPBOX_ACCESS_TOKEN')
-    DROPBOX_MONITOR_FOLDER = os.environ.get('DROPBOX_MONITOR_FOLDER', '')  # Monitor Otter app folder with PDFs
+    DROPBOX_MONITOR_FOLDER = os.environ.get('DROPBOX_MONITOR_FOLDER', '/apps/otter')  # Monitor Otter app folder with PDFs
 
     # AI Provider API Keys
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')

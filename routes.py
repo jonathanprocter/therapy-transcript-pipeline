@@ -706,3 +706,37 @@ def email_summary(transcript_id):
         logger.error(f"Error with email summary: {str(e)}")
         flash(f"Error with email summary: {str(e)}", 'error')
         return redirect(url_for('transcript_detail', transcript_id=transcript_id))
+
+@app.route('/api/manual-scan', methods=['POST'])
+def manual_scan():
+    """Manually trigger a Dropbox scan"""
+    try:
+        if not dropbox_service:
+            return jsonify({'error': 'Dropbox service not available'}), 503
+
+        # Get list of already processed files
+        try:
+            processed_files = [t.dropbox_path for t in db.session.query(Transcript).all() if t.dropbox_path]
+        except Exception as e:
+            logger.error(f"Error getting processed files: {str(e)}")
+            processed_files = []
+
+        # Scan for new files
+        new_files = dropbox_service.scan_for_new_files(processed_files)
+
+        return jsonify({
+            'success': True,
+            'message': f'Scan completed successfully. Found {len(new_files)} new files to process.',
+            'new_files': new_files,
+            'folder_checked': dropbox_service.monitor_folder or 'root folder'
+        })
+
+    except Exception as e:
+        logger.error(f"Error during manual scan: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'error': f'Scan failed: {str(e)}',
+            'message': 'Dropbox scan encountered an error. Please check your connection and folder permissions.'
+        }), 500

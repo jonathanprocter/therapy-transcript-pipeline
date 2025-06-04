@@ -113,7 +113,9 @@ class DropboxService:
                                 'content_hash': entry.content_hash
                             })
 
-            logger.info(f"Found {len(files)} supported files in {folder_path}")
+            logger.info(f"Found {len(files)} supported files in folder: '{folder_path}'")
+            if len(files) == 0:
+                logger.info(f"No files with supported extensions {Config.SUPPORTED_FILE_TYPES} found in '{folder_path}'")
             return files
 
         except dropbox.exceptions.ApiError as e:
@@ -173,7 +175,10 @@ class DropboxService:
                         new_files.append(file_info)
                         logger.info(f"Found new file: {file_info['name']}")
 
-            logger.info(f"Found {len(new_files)} new files to process")
+            if len(new_files) == 0:
+                logger.info(f"No new files to process. Checked {len(all_files)} existing files against {len(processed_files)} processed files")
+            else:
+                logger.info(f"Found {len(new_files)} new files to process out of {len(all_files)} total files")
             return new_files
 
         except Exception as e:
