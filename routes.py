@@ -83,50 +83,7 @@ def dashboard():
         flash(f"Error loading dashboard: {str(e)}", "error")
         return render_template('dashboard.html', clients=[], recent_logs=[], system_stats={})
 
-@app.route('/client/<int:client_id>')
-def client_details(client_id):
-    """Detailed view of a specific client"""
-    try:
-        client = db.session.get(Client, client_id)
-        if not client:
-            flash("Client not found", "error")
-            return redirect(url_for('dashboard'))
 
-        # Get all transcripts for this client
-        transcripts = db.session.query(Transcript)\
-            .filter(Transcript.client_id == client_id)\
-            .order_by(Transcript.session_date.desc()).all()
-
-        # Generate analytics if we have data
-        dashboard_data = {}
-        if transcripts and analytics_service:
-            try:
-                # Convert transcripts to format expected by analytics service
-                session_data = []
-                for transcript in transcripts:
-                    session_data.append({
-                        'session_date': transcript.session_date,
-                        'sentiment_score': transcript.sentiment_score,
-                        'key_themes': transcript.key_themes,
-                        'therapy_insights': transcript.therapy_insights,
-                        'raw_content': transcript.raw_content
-                    })
-
-                dashboard_data = analytics_service.generate_progress_dashboard(session_data)
-
-            except Exception as e:
-                logger.error(f"Error generating analytics for client {client_id}: {str(e)}")
-                dashboard_data = {}
-
-        return render_template('client_details.html', 
-                             client=client,
-                             transcripts=transcripts,
-                             dashboard_data=dashboard_data)
-
-    except Exception as e:
-        logger.error(f"Error loading client details: {str(e)}")
-        flash(f"Error loading client details: {str(e)}", "error")
-        return redirect(url_for('dashboard'))
 
 @app.route('/client/<int:client_id>/longitudinal-analysis')
 def longitudinal_analysis(client_id):
@@ -822,4 +779,58 @@ def email_summary(transcript_id):
         logger.error(f"Error with email summary: {str(e)}")
         flash(f"Error with email summary: {str(e)}", 'error')
         return redirect(url_for('transcript_detail', transcript_id=transcript_id))
+
+@app.route('/client/<int:client_id>')
+def client_details(client_id):
+    """Show detailed view of a specific client and their sessions"""
+    try:
+        # Get client
+        client = db.session.get(Client, client_id)
+        if not client:
+            flash('Client not found', 'error')
+            return redirect(url_for('dashboard'))
+        
+        # Get all transcripts for this client
+        transcripts = db.session.query(Transcript).filter_by(client_id=client_id).order_by(Transcript.session_date.desc()).all()
+        
+        # Calculate statistics
+        total_sessions = len(transcripts)
+        completed_sessions = len([t for t in transcripts if t.processing_status == 'completed'])
+        synced_sessions = len([t for t in transcripts if t.notion_synced])
+        
+        # Prepare transcript data with analysis status
+        transcript_data = []
+        for transcript in transcripts:
+            has_openai = bool(transcript.openai_analysis)
+            has_anthropic = bool(transcript.anthropic_analysis)
+            has_gemini = bool(transcript.gemini_analysis)
+            
+            transcript_data.append({
+                'id': transcript.id,
+                'filename': transcript.original_filename,
+                'session_date': transcript.session_date,
+                'processing_status': transcript.processing_status,
+                'notion_synced': transcript.notion_synced,
+                'has_openai': has_openai,
+                'has_anthropic': has_anthropic,
+                'has_gemini': has_gemini,
+                'ai_providers': f"{int(has_openai) + int(has_anthropic) + int(has_gemini)}/3"
+            })
+        
+        client_stats = {
+            'total_sessions': total_sessions,
+            'completed_sessions': completed_sessions,
+            'synced_sessions': synced_sessions,
+            'notion_connected': bool(client.notion_database_id)
+        }
+        
+        return render_template('client_details.html', 
+                             client=client,
+                             transcripts=transcript_data,
+                             client_stats=client_stats)
+        
+    except Exception as e:
+        logger.error(f"Error loading client details: {str(e)}")
+        flash(f"Error loading client details: {str(e)}", 'error')
+        return redirect(url_for('dashboard'))
 
