@@ -263,10 +263,31 @@ def manual_scan():
         if new_files is None:
             new_files = []
 
-        return jsonify({
-            'message': f'Scan completed. Found {len(new_files)} new files.',
-            'new_files': [f.get('name', 'Unknown') for f in new_files] if new_files else []
-        })
+        # If new files found, trigger processing
+        if new_files:
+            try:
+                from scheduler import process_new_files
+                # Process files in background
+                import threading
+                thread = threading.Thread(target=process_new_files)
+                thread.daemon = True
+                thread.start()
+                
+                return jsonify({
+                    'message': f'Scan completed. Found {len(new_files)} new files. Processing started.',
+                    'new_files': [f.get('name', 'Unknown') for f in new_files] if new_files else []
+                })
+            except Exception as e:
+                logger.error(f"Error starting background processing: {str(e)}")
+                return jsonify({
+                    'message': f'Scan completed. Found {len(new_files)} new files.',
+                    'new_files': [f.get('name', 'Unknown') for f in new_files] if new_files else []
+                })
+        else:
+            return jsonify({
+                'message': 'Scan completed. No new files found.',
+                'new_files': []
+            })
 
     except Exception as e:
         logger.error(f"Error during manual scan: {str(e)}")

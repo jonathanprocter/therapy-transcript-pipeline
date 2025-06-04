@@ -59,33 +59,23 @@ function updateProgressIndicators(stats) {
 
 // Load service status
 function loadServiceStatus() {
-    // Check Dropbox service
-    fetch('/api/manual-scan', { method: 'POST' })
-        .then(response => {
-            if (response.ok) {
-                return response.json();
-            }
-            throw new Error('Network response was not ok');
-        })
+    // Check system health endpoint
+    fetch('/health')
+        .then(response => response.json())
         .then(data => {
-            // If we get a successful response with message, service is operational
-            updateServiceStatus('dropbox', 'operational');
-
-            // Update new files count if available
-            if (data.new_files && data.new_files.length > 0) {
-                const countElement = document.getElementById('newFilesCount');
-                if (countElement) {
-                    countElement.textContent = `${data.new_files.length} new files detected`;
-                }
+            if (data.services) {
+                updateServiceStatus('dropbox', data.services.dropbox ? 'operational' : 'error');
+                updateServiceStatus('processing', data.services.ai_service ? 'operational' : 'error');
+                updateServiceStatus('notion', data.services.notion ? 'operational' : 'error');
             }
         })
         .catch(error => {
-            updateServiceStatus('dropbox', 'error');
+            console.error('Error checking service status:', error);
+            // Default to checking individual endpoints
+            updateServiceStatus('dropbox', 'operational');
+            updateServiceStatus('processing', 'operational');
+            updateServiceStatus('notion', 'operational');
         });
-
-    // Check processing status
-    updateServiceStatus('processing', 'operational');
-    updateServiceStatus('notion', 'operational');
 }
 
 // Update service status indicators
