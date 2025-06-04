@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify, redirect, url_for, flash
 from app import app, db
 from models import Client, Transcript, ProcessingLog, SystemSettings
 from services.dropbox_service import DropboxService
-fromservices.ai_service import AIService
+from services.ai_service import AIService
 from services.notion_service import NotionService
 from services.analytics_service import AnalyticsService
 from services.emotional_analysis import EmotionalAnalysis
