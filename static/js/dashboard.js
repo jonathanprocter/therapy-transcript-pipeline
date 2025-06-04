@@ -61,9 +61,23 @@ function updateProgressIndicators(stats) {
 function loadServiceStatus() {
     // Check Dropbox service
     fetch('/api/manual-scan', { method: 'POST' })
-        .then(response => response.json())
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            throw new Error('Network response was not ok');
+        })
         .then(data => {
-            updateServiceStatus('dropbox', data.error ? 'error' : 'operational');
+            // If we get a successful response with message, service is operational
+            updateServiceStatus('dropbox', 'operational');
+            
+            // Update new files count if available
+            if (data.new_files && data.new_files.length > 0) {
+                const countElement = document.getElementById('newFilesCount');
+                if (countElement) {
+                    countElement.textContent = `${data.new_files.length} new files detected`;
+                }
+            }
         })
         .catch(error => {
             updateServiceStatus('dropbox', 'error');
