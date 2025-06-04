@@ -142,11 +142,17 @@ def process_single_file(file_info, dropbox_service, document_processor, ai_servi
         if not validation_result['is_valid']:
             logger.warning(f"File {file_info['name']} failed validation: {validation_result['issues']}")
         
-        # Extract client identifier
-        client_name = document_processor.extract_client_identifier(
-            processed_data['cleaned_content'], 
-            file_info['name']
+        # Initialize content parser for intelligent extraction
+        content_parser = ContentParser()
+        
+        # Extract client name and date intelligently
+        extraction_info = content_parser.extract_comprehensive_info(
+            file_info['name'], 
+            processed_data['cleaned_content']
         )
+        
+        client_name = extraction_info['client_name'] or 'Unknown Client'
+        session_date = extraction_info['session_date'] or processed_data.get('extracted_date')
         
         # Find or create client
         client = db.session.query(Client).filter(Client.name.ilike(f'%{client_name}%')).first()
@@ -156,14 +162,25 @@ def process_single_file(file_info, dropbox_service, document_processor, ai_servi
             db.session.flush()  # Get the ID
             logger.info(f"Created new client: {client_name}")
         
-        # Create transcript record
+        # Check if transcript already exists for this client and date
+        existing_transcript = Transcript.query.filter_by(
+            client_id=client.id,
+            session_date=session_date,
+            original_filename=file_info['name']
+        ).first()
+        
+        if existing_transcript:
+            logger.info(f"Transcript already exists for {client_name} on {session_date}")
+            return True
+        
+        # Create transcript record with chronological ordering
         transcript = Transcript(
             client_id=client.id,
             original_filename=file_info['name'],
             dropbox_path=file_info['path'],
             file_type=processed_data['file_type'],
             raw_content=processed_data['raw_content'],
-            session_date=processed_data['extracted_date'],
+            session_date=session_date,
             processing_status='processing'
         )
         db.session.add(transcript)
