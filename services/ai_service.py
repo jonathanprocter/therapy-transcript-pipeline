@@ -118,16 +118,15 @@ class AIService:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert therapy transcript analyst. Provide detailed, professional analysis in JSON format."
+                        "content": "You are an expert clinical therapist with extensive training in psychotherapy and clinical documentation. Create comprehensive clinical progress notes using the full depth of your clinical expertise."
                     },
                     {
                         "role": "user", 
                         "content": prompt
                     }
                 ],
-                response_format={"type": "json_object"},
-                temperature=0.3,
-                max_tokens=2000
+                temperature=0.2,  # Lower temperature for clinical precision
+                max_tokens=4096  # Maximum tokens for comprehensive analysis
             )
             
             result = json.loads(response.choices[0].message.content)
