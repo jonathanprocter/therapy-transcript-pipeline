@@ -20,7 +20,9 @@ class DropboxService:
             reload(config)
 
             self.access_token = os.environ.get('DROPBOX_ACCESS_TOKEN') or Config.DROPBOX_ACCESS_TOKEN
-            self.monitor_folder = Config.DROPBOX_MONITOR_FOLDER
+            self.monitor_folder = getattr(Config, 'DROPBOX_MONITOR_FOLDER', '/apps/otter')
+            
+            logger.info(f"Initializing Dropbox service with folder: {self.monitor_folder}")
 
             if not self.access_token or self.access_token.startswith('your_'):
                 logger.warning("Dropbox access token not configured properly")
@@ -64,12 +66,18 @@ class DropboxService:
 
     def list_files(self, folder_path: str = None) -> List[Dict]:
         """List files in the specified folder"""
+        if not self.client:
+            logger.error("Dropbox client not initialized")
+            return []
+            
         if folder_path is None:
             folder_path = self.monitor_folder
 
+        logger.info(f"Listing files in folder: {folder_path}")
+        
         # Try to validate/create the folder path first
         folder_path = self._validate_folder_path(folder_path)
-        if not folder_path:
+        if folder_path is None:
             logger.warning("No valid folder path available")
             return []
 
@@ -206,7 +214,10 @@ class DropboxService:
     def _validate_folder_path(self, folder_path: str) -> str:
         """Validate and fix folder path if needed"""
         if not folder_path:
-            return ""
+            logger.info("No folder path provided, trying default paths")
+            folder_path = "/apps/otter"
+        
+        logger.info(f"Attempting to validate folder path: {folder_path}")
         
         # Common path variations to try
         paths_to_try = [
@@ -220,10 +231,12 @@ class DropboxService:
         
         for path in paths_to_try:
             try:
+                logger.info(f"Trying folder path: '{path}'")
                 self.client.files_list_folder(path)
-                logger.info(f"Valid folder path found: {path}")
+                logger.info(f"Valid folder path found: '{path}'")
                 return path
-            except dropbox.exceptions.ApiError:
+            except dropbox.exceptions.ApiError as e:
+                logger.debug(f"Path '{path}' failed: {str(e)}")
                 continue
                 
         logger.warning("No valid folder path found, will use root folder")
