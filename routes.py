@@ -736,6 +736,7 @@ def send_email_summary(transcript_id):
             return redirect(url_for('client_details', client_id=transcript.client_id))
 
         # Check if SendGrid API key is available
+        import os
         if not os.environ.get('SENDGRID_API_KEY'):
             flash('Email service not configured. Please contact administrator.', 'error')
             return redirect(url_for('client_details', client_id=transcript.client_id))

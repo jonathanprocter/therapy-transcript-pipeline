@@ -173,6 +173,14 @@
                                                class="btn btn-outline-primary" title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            {% if transcript.processing_status == 'completed' and (transcript.has_openai or transcript.has_anthropic or transcript.has_gemini) %}
+                                            <button type="button" class="btn btn-outline-success" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#emailModal{{ transcript.id }}" 
+                                                    title="Email Summary">
+                                                <i class="fas fa-envelope"></i>
+                                            </button>
+                                            {% endif %}
                                             {% if transcript.processing_status == 'completed' %}
                                             <a href="{{ url_for('reprocess_transcript', transcript_id=transcript.id) }}" 
                                                class="btn btn-outline-warning" title="Reprocess">
@@ -198,6 +206,82 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Email Summary Modals -->
+        {% for transcript in transcripts %}
+        {% if transcript.processing_status == 'completed' and (transcript.has_openai or transcript.has_anthropic or transcript.has_gemini) %}
+        <div class="modal fade" id="emailModal{{ transcript.id }}" tabindex="-1" aria-labelledby="emailModalLabel{{ transcript.id }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="emailModalLabel{{ transcript.id }}">
+                            <i class="fas fa-envelope me-2"></i>Email Session Summary
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('send_email_summary', transcript_id=transcript.id) }}">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <h6 class="fw-bold">Session Details</h6>
+                                <p class="mb-1"><strong>Client:</strong> {{ client.name }}</p>
+                                <p class="mb-1"><strong>Date:</strong> 
+                                    {% if transcript.session_date %}
+                                        {{ transcript.session_date.strftime('%B %d, %Y') }}
+                                    {% else %}
+                                        Unknown Date
+                                    {% endif %}
+                                </p>
+                                <p class="mb-3"><strong>File:</strong> {{ transcript.filename }}</p>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="recipient_email{{ transcript.id }}" class="form-label">
+                                    <i class="fas fa-at me-1"></i>Recipient Email Address *
+                                </label>
+                                <input type="email" 
+                                       class="form-control" 
+                                       id="recipient_email{{ transcript.id }}" 
+                                       name="recipient_email" 
+                                       placeholder="Enter email address to send summary"
+                                       required>
+                                <div class="form-text">The comprehensive session summary will be sent to this email address.</div>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading mb-2">
+                                    <i class="fas fa-info-circle me-1"></i>Summary Includes:
+                                </h6>
+                                <ul class="mb-0 small">
+                                    <li>Concise session overview with key themes</li>
+                                    <li>Bulleted points of topics discussed</li>
+                                    <li>Therapeutic insights and clinical observations</li>
+                                    <li>Action items and homework assignments</li>
+                                    <li>Follow-up questions for next session</li>
+                                    <li>Progress indicators and client statements</li>
+                                </ul>
+                            </div>
+
+                            <div class="alert alert-success">
+                                <small>
+                                    <i class="fas fa-shield-alt me-1"></i>
+                                    <strong>Secure:</strong> Email sent via encrypted SendGrid service with professional formatting.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-paper-plane me-1"></i>Send Summary
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
     </div>
 </div>
 
