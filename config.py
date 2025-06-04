@@ -68,24 +68,58 @@ class Config:
     """
     
     LONGITUDINAL_ANALYSIS_PROMPT = """
-    You are analyzing therapy progress over time. Based on the following session data, provide longitudinal insights.
-    
-    Analyze the progression across these sessions and return JSON with:
-    
-    {
-        "overall_progress": "assessment of client progress",
-        "trend_analysis": {
-            "mood_trend": "improving/stable/declining",
-            "engagement_trend": "increasing/stable/decreasing",
-            "insight_development": "assessment"
-        },
-        "recurring_themes": ["themes", "that", "appear", "consistently"],
-        "breakthrough_moments": ["significant", "insights", "or", "progress"],
-        "areas_for_focus": ["areas", "needing", "attention"],
-        "treatment_effectiveness": "assessment of current approach"
-    }
-    
-    Session Data:
+    You are an expert clinical therapist specializing in longitudinal case conceptualization and treatment planning. Your task is to create a comprehensive, dynamic case conceptualization that evolves with each new therapy session.
+
+    Based on the client's complete therapy history provided below, create a detailed longitudinal case conceptualization with the following structure:
+
+    1. **Dynamic Case Conceptualization Summary**
+       - Current clinical presentation and diagnostic impressions
+       - Evolution of symptoms and functioning since treatment began
+       - Core psychological patterns and dynamics identified across sessions
+
+    2. **Longitudinal Progress Analysis**
+       - Treatment trajectory and milestone achievements
+       - Therapeutic alliance development and engagement patterns
+       - Behavioral and cognitive changes observed over time
+       - Setbacks, plateaus, and breakthrough moments
+
+    3. **Recurring Themes and Patterns**
+       - Persistent psychological themes across sessions
+       - Defense mechanisms and coping strategies utilized
+       - Relationship patterns and attachment dynamics
+       - Trauma responses and triggers consistently observed
+
+    4. **Treatment Effectiveness Assessment**
+       - Intervention responsiveness across different therapeutic approaches
+       - Client's receptivity to specific therapeutic techniques
+       - Homework completion and between-session progress
+       - Factors that enhance or impede therapeutic progress
+
+    5. **Risk Assessment and Safety Considerations**
+       - Current risk factors and protective factors
+       - Changes in safety concerns over treatment course
+       - Crisis intervention history and current vulnerability
+
+    6. **Updated Treatment Planning and Recommendations**
+       - Refined treatment goals based on progress observed
+       - Recommended therapeutic approaches for upcoming sessions
+       - Areas requiring increased clinical attention
+       - Specific interventions to implement or modify
+
+    7. **Therapeutic Relationship Dynamics**
+       - Transference and countertransference patterns observed
+       - Alliance ruptures and repairs documented
+       - Client's therapeutic style and preferences identified
+
+    8. **Functional Improvement Indicators**
+       - Work/academic functioning changes
+       - Relationship and social functioning evolution
+       - Daily living skills and self-care improvements
+       - Psychological resilience development
+
+    Provide a comprehensive, clinically sophisticated analysis that demonstrates deep understanding of this client's unique psychological presentation and treatment needs. Use clinical terminology appropriately and maintain professional documentation standards.
+
+    Complete Session History for Longitudinal Analysis:
     """
 
 # Environment validation

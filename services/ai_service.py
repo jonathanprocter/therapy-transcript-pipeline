@@ -129,9 +129,14 @@ class AIService:
                 max_tokens=4096  # Maximum tokens for comprehensive analysis
             )
             
-            result = json.loads(response.choices[0].message.content)
-            result['provider'] = 'openai'
-            result['model'] = Config.OPENAI_MODEL
+            # Return the comprehensive clinical note as text
+            content = response.choices[0].message.content
+            result = {
+                'clinical_progress_note': content,
+                'provider': 'openai',
+                'model': Config.OPENAI_MODEL,
+                'analysis_type': 'comprehensive_clinical'
+            }
             
             return result
             
@@ -146,8 +151,8 @@ class AIService:
             
             response = self.anthropic_client.messages.create(
                 model=Config.ANTHROPIC_MODEL,  # the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
-                max_tokens=2000,
-                temperature=0.3,
+                max_tokens=8192,  # Maximum tokens for comprehensive clinical analysis
+                temperature=0.2,  # Lower temperature for clinical precision
                 messages=[
                     {
                         "role": "user",
@@ -156,9 +161,14 @@ class AIService:
                 ]
             )
             
-            result = json.loads(response.content[0].text)
-            result['provider'] = 'anthropic'
-            result['model'] = Config.ANTHROPIC_MODEL
+            # Return the comprehensive clinical note as text
+            content = response.content[0].text
+            result = {
+                'clinical_progress_note': content,
+                'provider': 'anthropic',
+                'model': Config.ANTHROPIC_MODEL,
+                'analysis_type': 'comprehensive_clinical'
+            }
             
             return result
             

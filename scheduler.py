@@ -9,6 +9,7 @@ from services.dropbox_service import DropboxService
 from services.document_processor import DocumentProcessor
 from services.ai_service import AIService
 from services.notion_service import NotionService
+from services.content_parser import ContentParser
 from config import Config
 import json
 
