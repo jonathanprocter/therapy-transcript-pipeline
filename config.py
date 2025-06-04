@@ -2,33 +2,33 @@ import os
 
 class Config:
     """Configuration class for the therapy transcript processor"""
-    
+
     # Dropbox configuration
     DROPBOX_ACCESS_TOKEN = os.environ.get('DROPBOX_ACCESS_TOKEN')
-    DROPBOX_MONITOR_FOLDER = '/apps/otter'  # Monitor Otter app folder with PDFs
-    
+    DROPBOX_MONITOR_FOLDER = os.environ.get('DROPBOX_MONITOR_FOLDER', '')  # Monitor Otter app folder with PDFs
+
     # AI Provider API Keys
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY') 
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-    
+
     # Notion configuration
     NOTION_INTEGRATION_SECRET = os.environ.get('NOTION_INTEGRATION_SECRET')
     NOTION_DATABASE_ID = os.environ.get('NOTION_DATABASE_ID')
     NOTION_PARENT_PAGE_ID = '2049f30def818033b42af330a18aa313'  # Parent page for client databases
-    
+
     # Processing configuration
     SUPPORTED_FILE_TYPES = ['.pdf', '.txt', '.docx']
     MAX_FILE_SIZE_MB = 50
-    
+
     # Scheduler configuration
     DROPBOX_SCAN_INTERVAL_MINUTES = 5
-    
+
     # AI Model configurations
     OPENAI_MODEL = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
     ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"  # the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
     GEMINI_MODEL = "gemini-pro"
-    
+
     # Analysis prompts
     THERAPY_ANALYSIS_PROMPT = """
     You are a highly skilled and experienced therapist specializing in creating comprehensive and insightful clinical progress notes. Your task is to analyze the provided counseling session transcript and generate a detailed progress note with the depth, detail, and clinical sophistication of an expert human therapist.
@@ -75,7 +75,7 @@ class Config:
 
     Transcript:
     """
-    
+
     LONGITUDINAL_ANALYSIS_PROMPT = """
     You are an expert clinical therapist specializing in longitudinal case conceptualization and treatment planning. Your task is to create a comprehensive, dynamic case conceptualization that evolves with each new therapy session.
 
@@ -141,16 +141,16 @@ def validate_environment():
         'GEMINI_API_KEY',
         'NOTION_INTEGRATION_SECRET'
     ]
-    
+
     missing_vars = []
     for var in required_vars:
         if not os.environ.get(var):
             missing_vars.append(var)
-    
+
     if missing_vars:
         print(f"Warning: Missing environment variables: {', '.join(missing_vars)}")
         print("The application may not function properly without these variables.")
-    
+
     return len(missing_vars) == 0
 
 # Call validation on import

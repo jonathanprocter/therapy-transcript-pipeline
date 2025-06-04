@@ -67,6 +67,12 @@ class DropboxService:
         if folder_path is None:
             folder_path = self.monitor_folder
 
+        # Try to validate/create the folder path first
+        folder_path = self._validate_folder_path(folder_path)
+        if not folder_path:
+            logger.warning("No valid folder path available")
+            return []
+
         try:
             files = []
             result = self.client.files_list_folder(folder_path)
@@ -103,6 +109,10 @@ class DropboxService:
             return files
 
         except dropbox.exceptions.ApiError as e:
+            if "not_found" in str(e):
+                logger.warning(f"Folder {folder_path} not found, trying to create it or use root folder")
+                # Try root folder as fallback
+                return self._list_files_fallback()
             logger.error(f"Dropbox API error while listing files: {str(e)}")
             return []
         except Exception as e:
@@ -192,6 +202,57 @@ class DropboxService:
                 return False
 
         return True
+
+    def _validate_folder_path(self, folder_path: str) -> str:
+        """Validate and fix folder path if needed"""
+        if not folder_path:
+            return ""
+        
+        # Common path variations to try
+        paths_to_try = [
+            folder_path,
+            folder_path.replace("/apps/otter", "/Apps/Otter"),
+            folder_path.replace("/apps/otter", "/apps/Otter"),
+            "/Apps/Otter",
+            "/apps/otter",
+            ""  # Root folder
+        ]
+        
+        for path in paths_to_try:
+            try:
+                self.client.files_list_folder(path)
+                logger.info(f"Valid folder path found: {path}")
+                return path
+            except dropbox.exceptions.ApiError:
+                continue
+                
+        logger.warning("No valid folder path found, will use root folder")
+        return ""
+    
+    def _list_files_fallback(self) -> List[Dict]:
+        """Fallback method to list files from root folder"""
+        try:
+            files = []
+            result = self.client.files_list_folder("")
+            
+            for entry in result.entries:
+                if isinstance(entry, dropbox.files.FileMetadata):
+                    file_ext = os.path.splitext(entry.name)[1].lower()
+                    if file_ext in Config.SUPPORTED_FILE_TYPES:
+                        files.append({
+                            'name': entry.name,
+                            'path': entry.path_lower,
+                            'size': entry.size,
+                            'modified': entry.client_modified,
+                            'content_hash': entry.content_hash
+                        })
+            
+            logger.info(f"Found {len(files)} supported files in root folder")
+            return files
+            
+        except Exception as e:
+            logger.error(f"Error in fallback file listing: {str(e)}")
+            return []
 
     def create_backup_folder(self, folder_name: str) -> bool:
         """Create a backup folder for processed files"""
