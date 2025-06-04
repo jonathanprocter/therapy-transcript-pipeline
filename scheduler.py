@@ -164,15 +164,19 @@ def process_single_file(file_info, dropbox_service, document_processor, ai_servi
             db.session.flush()  # Get the ID
             logger.info(f"Created new client: {client_name}")
         
-        # Check if transcript already exists for this client and date
+        # Check for duplicates - skip if transcript already exists
         existing_transcript = Transcript.query.filter_by(
             client_id=client.id,
-            session_date=session_date,
             original_filename=file_info['name']
         ).first()
         
-        if existing_transcript:
-            logger.info(f"Transcript already exists for {client_name} on {session_date}")
+        # Also check by dropbox path to catch path duplicates
+        existing_by_path = Transcript.query.filter_by(
+            dropbox_path=file_info['path']
+        ).first()
+        
+        if existing_transcript or existing_by_path:
+            logger.info(f"Duplicate detected - skipping {file_info['name']} for {client_name}")
             return True
         
         # Create transcript record with chronological ordering
