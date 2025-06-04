@@ -209,6 +209,31 @@ def settings():
         flash(f"Error loading settings: {str(e)}", "error")
         return render_template('settings.html', service_status={}, settings={})
 
+@app.route('/api/system-stats')
+def api_system_stats():
+    """API endpoint for system statistics"""
+    try:
+        # Get system statistics
+        total_clients = db.session.query(Client).count()
+        total_transcripts = db.session.query(Transcript).count()
+        pending_transcripts = db.session.query(Transcript)\
+            .filter(Transcript.processing_status == 'pending').count()
+        failed_transcripts = db.session.query(Transcript)\
+            .filter(Transcript.processing_status == 'failed').count()
+        
+        system_stats = {
+            'total_clients': total_clients,
+            'total_transcripts': total_transcripts,
+            'pending_processing': pending_transcripts,
+            'failed_processing': failed_transcripts
+        }
+        
+        return jsonify({'system_stats': system_stats})
+        
+    except Exception as e:
+        logger.error(f"Error getting system stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/manual-scan', methods=['POST'])
 def manual_scan():
     """Manually trigger a Dropbox scan"""
