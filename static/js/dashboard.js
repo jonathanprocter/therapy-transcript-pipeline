@@ -376,11 +376,60 @@ function hideLoading() {
     }
 }
 
+// Test Dropbox connection
+function testDropboxConnection() {
+    const testBtn = document.getElementById('testDropboxBtn');
+    
+    if (testBtn) {
+        testBtn.disabled = true;
+        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing...';
+    }
+
+    fetch('/api/test-dropbox', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showAlert(`Dropbox Connected Successfully!<br>
+                Account: ${data.account_name}<br>
+                ${data.folder_status}<br>
+                Files found: ${data.files_found}`, 'success');
+            updateServiceStatus('dropbox', 'operational');
+        } else {
+            showAlert(`Dropbox Test Failed: ${data.error}`, 'danger');
+            updateServiceStatus('dropbox', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Dropbox test error:', error);
+        showAlert(`Dropbox Test Failed: ${error.message}`, 'danger');
+        updateServiceStatus('dropbox', 'error');
+    })
+    .finally(() => {
+        if (testBtn) {
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i class="fas fa-plug me-1"></i>Test Connection';
+        }
+    });
+}
+
 // Export functions for global access (only if not already exported)
 if (!window.loadSystemStats) {
     window.loadSystemStats = loadSystemStats;
     window.triggerManualScan = triggerManualScan;
     window.loadProcessingLogs = loadProcessingLogs;
+    window.testDropboxConnection = testDropboxConnection;
     window.showAlert = showAlert;
     window.showLoading = showLoading;
     window.hideLoading = hideLoading;
