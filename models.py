@@ -62,8 +62,8 @@ class ProcessingLog(db.Model):
     message = db.Column(Text)
     error_details = db.Column(Text)
     
-    # Metadata
-    metadata = db.Column(JSON)  # Additional context data
+    # Additional context data
+    context_metadata = db.Column(JSON)  # Additional context data
     
     # Timestamps
     created_at = db.Column(DateTime, default=lambda: datetime.now(timezone.utc))

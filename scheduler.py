@@ -100,7 +100,7 @@ def scan_and_process_files():
                         status='error',
                         message=f"Failed to process {file_info['name']}",
                         error_details=str(e),
-                        metadata={'file_info': file_info}
+                        context_metadata={'file_info': file_info}
                     )
                     db.session.add(error_log)
                     db.session.commit()
@@ -207,7 +207,7 @@ def process_single_file(file_info, dropbox_service, document_processor, ai_servi
             activity_type='file_process',
             status='success',
             message=f"Successfully processed {file_info['name']}",
-            metadata={'client_name': client_name, 'file_size': file_info['size']}
+            context_metadata={'client_name': client_name, 'file_size': file_info['size']}
         )
         db.session.add(success_log)
         db.session.commit()
