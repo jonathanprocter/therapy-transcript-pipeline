@@ -9,7 +9,7 @@ deploymentTarget = "autoscale"
 run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
 
 [workflows]
-runButton = "Start App"
+runButton = "Run App"
 
 [[workflows.workflow]]
 name = "Project"
@@ -60,6 +60,19 @@ args = "python main.py"
 name = "Start App"
 author = 37925715
 mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+
+[[workflows.workflow]]
+name = "Run App"
+author = 37925715
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pkill -f \"python.*main.py\" || true"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
