@@ -145,7 +145,15 @@ class DropboxService:
         
         # Check if file is recent (within last 30 days for initial processing)
         if file_info['modified']:
-            days_old = (datetime.now(timezone.utc) - file_info['modified']).days
+            # Ensure both datetimes are timezone-aware
+            now_utc = datetime.now(timezone.utc)
+            file_modified = file_info['modified']
+            
+            # Convert to UTC if naive datetime
+            if file_modified.tzinfo is None:
+                file_modified = file_modified.replace(tzinfo=timezone.utc)
+            
+            days_old = (now_utc - file_modified).days
             if days_old > 30:
                 logger.info(f"Skipping old file {file_info['name']} (modified {days_old} days ago)")
                 return False
