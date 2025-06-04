@@ -1,21 +1,33 @@
 // Dashboard utilities and functionality
 console.log('Dashboard utilities loaded successfully');
 
-// Initialize dashboard when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard initialized successfully');
-    loadSystemStats();
-    loadServiceStatus();
+// Prevent multiple initializations
+if (window.dashboardInitialized) {
+    console.log('Dashboard already initialized, skipping...');
+} else {
+    window.dashboardInitialized = true;
 
-    // Refresh stats every 30 seconds
-    setInterval(loadSystemStats, 30000);
-    setInterval(loadServiceStatus, 60000);
-});
+    // Initialize dashboard when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Dashboard initialized successfully');
+        loadSystemStats();
+        loadServiceStatus();
+
+        // Refresh stats every 30 seconds
+        setInterval(loadSystemStats, 30000);
+        setInterval(loadServiceStatus, 60000);
+    });
+}
 
 // Load and display system statistics
 function loadSystemStats() {
     fetch('/api/system-stats')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.system_stats) {
                 updateSystemStats(data.system_stats);
@@ -57,87 +69,16 @@ function updateProgressIndicators(stats) {
     }
 }
 
-// Manual scan functionality
-function performManualScan() {
-    const scanButton = document.getElementById('manualScanButton');
-    const statusDiv = document.getElementById('scanStatus');
-
-    if (scanButton) {
-        scanButton.disabled = true;
-        scanButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning...';
-    }
-
-    if (statusDiv) {
-        statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>Scanning for new files...</div>';
-    }
-
-    fetch('/api/manual-scan', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (scanButton) {
-            scanButton.disabled = false;
-            scanButton.innerHTML = '<i class="fas fa-search me-1"></i>Scan Dropbox';
-        }
-
-        if (statusDiv) {
-            if (data.error) {
-                statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
-                updateServiceStatus('dropbox', 'error');
-            } else {
-                const newFileCount = data.new_files ? data.new_files.length : 0;
-                statusDiv.innerHTML = `<div class="alert alert-success"><i class="fas fa-check me-2"></i>${data.message}</div>`;
-                updateServiceStatus('dropbox', 'operational');
-
-                // Update new files count in the dashboard
-                updateNewFilesCount(newFileCount);
-            }
-        }
-
-        // Refresh system stats and logs
-        setTimeout(() => {
-            loadSystemStats();
-            loadProcessingLogs();
-        }, 1000);
-    })
-    .catch(error => {
-        console.error('Error during manual scan:', error);
-
-        if (scanButton) {
-            scanButton.disabled = false;
-            scanButton.innerHTML = '<i class="fas fa-search me-1"></i>Scan Dropbox';
-        }
-
-        if (statusDiv) {
-            statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Scan failed. Please check your connection.</div>';
-        }
-
-        updateServiceStatus('dropbox', 'error');
-    });
-}
-
-function updateNewFilesCount(count) {
-    const countElement = document.getElementById('newFilesCount');
-    if (countElement) {
-        if (count > 0) {
-            countElement.textContent = `${count} new files detected`;
-            countElement.className = 'badge bg-warning';
-        } else {
-            countElement.textContent = 'No new files';
-            countElement.className = 'badge bg-success';
-        }
-    }
-}
-
 // Load service status
 function loadServiceStatus() {
     // Check system health endpoint
     fetch('/health')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.status === 'healthy') {
                 updateServiceStatus('processing', 'operational');
@@ -195,74 +136,79 @@ function updateServiceStatus(service, status) {
 // Manual scan trigger
 function triggerManualScan() {
     const scanBtn = document.getElementById('manualScanBtn');
+    const newFilesCount = document.getElementById('newFilesCount');
+
     if (scanBtn) {
         scanBtn.disabled = true;
         scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning...';
+    }
 
-        fetch('/api/manual-scan', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                showAlert('Scan failed: ' + data.error, 'danger');
-                updateServiceStatus('dropbox', 'error');
-            } else {
-                showAlert(data.message || 'Scan completed successfully', 'success');
-                updateServiceStatus('dropbox', 'operational');
+    if (newFilesCount) {
+        newFilesCount.textContent = 'Scanning...';
+        newFilesCount.className = 'badge bg-warning';
+    }
 
-                // Update new files count if available
-                if (data.new_files && data.new_files.length > 0) {
-                    updateNewFilesCount(data.new_files.length);
-                } else {
-                    updateNewFilesCount(0);
-                }
-
-                // Refresh stats and logs
-                setTimeout(() => {
-                    loadSystemStats();
-                    loadProcessingLogs();
-                }, 2000);
-            }
-        })
-        .catch(error => {
-            console.error('Manual scan error:', error);
-            showAlert('Error performing manual scan: ' + error.message, 'danger');
+    fetch('/api/manual-scan', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            showAlert('Scan failed: ' + data.error, 'danger');
             updateServiceStatus('dropbox', 'error');
-        })
-        .finally(() => {
+            if (newFilesCount) {
+                newFilesCount.textContent = 'Scan failed';
+                newFilesCount.className = 'badge bg-danger';
+            }
+        } else {
+            showAlert(data.message || 'Scan completed successfully', 'success');
+            updateServiceStatus('dropbox', 'operational');
+
+            // Update new files count if available
+            if (data.new_files && data.new_files.length > 0) {
+                if (newFilesCount) {
+                    newFilesCount.textContent = `${data.new_files.length} new files detected`;
+                    newFilesCount.className = 'badge bg-success';
+                }
+            } else {
+                if (newFilesCount) {
+                    newFilesCount.textContent = 'No new files';
+                    newFilesCount.className = 'badge bg-secondary';
+                }
+            }
+
+            // Refresh stats and logs
+            setTimeout(() => {
+                loadSystemStats();
+                loadProcessingLogs();
+            }, 2000);
+        }
+    })
+    .catch(error => {
+        console.error('Manual scan error:', error);
+        showAlert('Error performing manual scan: ' + error.message, 'danger');
+        updateServiceStatus('dropbox', 'error');
+        if (newFilesCount) {
+            newFilesCount.textContent = 'Scan failed';
+            newFilesCount.className = 'badge bg-danger';
+        }
+    })
+    .finally(() => {
+        if (scanBtn) {
             scanBtn.disabled = false;
             scanBtn.innerHTML = '<i class="fas fa-sync me-1"></i>Manual Scan';
-        });
-    }
+        }
+    });
 }
 
-// Show alert message
-function showAlert(message, type) {
-    const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-
-    const container = document.querySelector('.alert-container') || document.querySelector('.container').firstElementChild;
-    if (container) {
-        container.insertAdjacentHTML('afterbegin', alertHtml);
-    }
-}
-
-// Export functions for global access
-window.loadSystemStats = loadSystemStats;
-window.triggerManualScan = triggerManualScan;
 // Load processing logs
 function loadProcessingLogs() {
     fetch('/api/processing-logs')
@@ -315,156 +261,73 @@ function loadProcessingLogs() {
         }
     });
 }
-// Auto-refresh system stats every 30 seconds
-function updateSystemStats() {
-    fetch('/api/system-stats')
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.system_stats) {
-            // Update stat counters
-            const clientsElement = document.querySelector('[data-stat="clients"]');
-            const transcriptsElement = document.querySelector('[data-stat="transcripts"]');
-            const pendingElement = document.querySelector('[data-stat="pending"]');
-            const failedElement = document.querySelector('[data-stat="failed"]');
 
-            if (clientsElement) clientsElement.textContent = data.system_stats.total_clients || 0;
-            if (transcriptsElement) transcriptsElement.textContent = data.system_stats.total_transcripts || 0;
-            if (pendingElement) pendingElement.textContent = data.system_stats.pending_processing || 0;
-            if (failedElement) failedElement.textContent = data.system_stats.failed_processing || 0;
-        }
-    })
-    .catch(error => {
-        console.error('Failed to update system stats:', error);
-        // Don't show error to user, just log it
-    });
-}
+// Show alert message
+function showAlert(message, type) {
+    // Remove existing alerts
+    const existingAlerts = document.querySelectorAll('.alert-container .alert');
+    existingAlerts.forEach(alert => alert.remove());
 
-// Manual scan functionality
-function triggerManualScan() {
-    const scanBtn = document.getElementById('manualScanBtn');
-    if (scanBtn) {
-        scanBtn.disabled = true;
-        scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning...';
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
 
-        fetch('/api/manual-scan', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                showAlert('Scan failed: ' + data.error, 'danger');
-            } else {
-                showAlert(data.message || 'Scan completed successfully', 'success');
-
-                // Update new files count if available
-                if (data.new_files && data.new_files.length > 0) {
-                    const countElement = document.getElementById('newFilesCount');
-                    if (countElement) {
-                        countElement.textContent = `${data.new_files.length} new files detected`;
-                    }
-                }
-
-                // Refresh stats and logs
-                updateSystemStats();
-                loadProcessingLogs();
-            }
-        })
-        .catch(error => {
-            console.error('Manual scan error:', error);
-            showAlert('Scan failed: ' + error.message, 'danger');
-        })
-        .finally(() => {
-            scanBtn.disabled = false;
-            scanBtn.innerHTML = '<i class="fas fa-sync me-1"></i>Manual Scan';
-        });
-    }
-}
-// Initialize dashboard on page load
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard utilities loaded successfully');
-
-    // Load initial data
-    loadServiceStatus();
-    updateSystemStats();
-    loadProcessingLogs();
-
-    console.log('Dashboard initialized successfully');
-});
-
-// Auto-refresh data every 30 seconds
-setInterval(() => {
-    updateSystemStats();
-    loadProcessingLogs();
-}, 30000);
-
-// Auto-refresh service status every 60 seconds
-setInterval(loadServiceStatus, 60000);
-
-function manualScan() {
-    const scanBtn = document.getElementById('manualScanBtn');
-    if (scanBtn) {
-        scanBtn.disabled = true;
-        scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
+    let container = document.querySelector('.alert-container');
+    if (!container) {
+        // Create alert container if it doesn't exist
+        container = document.createElement('div');
+        container.className = 'alert-container';
+        container.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1050; width: 400px;';
+        document.body.appendChild(container);
     }
 
-    fetch('/api/manual-scan', { 
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
+    container.insertAdjacentHTML('beforeend', alertHtml);
+
+    // Auto-remove alert after 5 seconds
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
         }
-    })
-        .then(response => {
-            return response.json().then(data => {
-                if (!response.ok) {
-                    throw new Error(data.error || `HTTP error! status: ${response.status}`);
-                }
-                return data;
-            });
-        })
-        .then(data => {
-            showAlert(data.message || 'Scan completed successfully', 'success');
-
-            // Update new files count if available
-            if (data.new_files && data.new_files.length > 0) {
-                const countElement = document.getElementById('newFilesCount');
-                if (countElement) {
-                    countElement.textContent = `${data.new_files.length} new files detected`;
-                }
-            }
-
-            // Refresh data after a short delay
-            setTimeout(() => {
-                loadSystemStats();
-                loadProcessingLogs();
-            }, 2000);
-        })
-        .catch(error => {
-            console.error('Manual scan error:', error);
-            showAlert('Error performing manual scan: ' + error.message, 'danger');
-        })
-        .finally(() => {
-            if (scanBtn) {
-                scanBtn.disabled = false;
-                scanBtn.innerHTML = '<i class="fas fa-sync me-2"></i>Manual Scan';
-            }
-        });
+    }, 5000);
 }
 
-// Auto-refresh data every 60 seconds (reduced frequency)
-setInterval(() => {
-    updateSystemStats();
-    loadProcessingLogs();
-}, 60000);
+// Show loading indicator
+function showLoading() {
+    const loadingHtml = `
+        <div id="loadingIndicator" class="alert alert-info">
+            <i class="fas fa-spinner fa-spin me-2"></i>Processing...
+        </div>
+    `;
+
+    let container = document.querySelector('.alert-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'alert-container';
+        container.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1050; width: 400px;';
+        document.body.appendChild(container);
+    }
+
+    container.insertAdjacentHTML('beforeend', loadingHtml);
+}
+
+// Hide loading indicator
+function hideLoading() {
+    const loading = document.getElementById('loadingIndicator');
+    if (loading) {
+        loading.remove();
+    }
+}
+
+// Export functions for global access (only if not already exported)
+if (!window.loadSystemStats) {
+    window.loadSystemStats = loadSystemStats;
+    window.triggerManualScan = triggerManualScan;
+    window.loadProcessingLogs = loadProcessingLogs;
+    window.showAlert = showAlert;
+    window.showLoading = showLoading;
+    window.hideLoading = hideLoading;
+}
