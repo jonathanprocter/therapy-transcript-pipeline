@@ -7,7 +7,6 @@ import sys
 import logging
 from datetime import datetime, timezone
 import re
-from sqlalchemy import create_database_url
 
 # Add project root to path
 sys.path.append('.')
