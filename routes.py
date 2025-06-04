@@ -213,14 +213,45 @@ def settings():
 @app.route('/api/system-stats')
 def api_system_stats():
     """API endpoint for system statistics"""
+    default_response = {
+        'system_stats': {
+            'total_clients': 0,
+            'total_transcripts': 0,
+            'pending_processing': 0,
+            'failed_processing': 0
+        }
+    }
+    
     try:
-        # Get system statistics
-        total_clients = db.session.query(Client).count()
-        total_transcripts = db.session.query(Transcript).count()
-        pending_transcripts = db.session.query(Transcript)\
-            .filter(Transcript.processing_status == 'pending').count()
-        failed_transcripts = db.session.query(Transcript)\
-            .filter(Transcript.processing_status == 'failed').count()
+        # Ensure database session is fresh
+        db.session.close()
+        
+        # Get system statistics with individual error handling
+        try:
+            total_clients = db.session.query(Client).count()
+        except Exception as e:
+            logger.warning(f"Error counting clients: {str(e)}")
+            total_clients = 0
+            
+        try:
+            total_transcripts = db.session.query(Transcript).count()
+        except Exception as e:
+            logger.warning(f"Error counting transcripts: {str(e)}")
+            total_transcripts = 0
+            
+        try:
+            pending_transcripts = db.session.query(Transcript)\
+                .filter(Transcript.processing_status == 'pending').count()
+        except Exception as e:
+            logger.warning(f"Error counting pending transcripts: {str(e)}")
+            pending_transcripts = 0
+            
+        try:
+            failed_transcripts = db.session.query(Transcript)\
+                .filter(Transcript.processing_status == 'failed').count()
+        except Exception as e:
+            logger.warning(f"Error counting failed transcripts: {str(e)}")
+            failed_transcripts = 0
 
         system_stats = {
             'total_clients': total_clients,
@@ -229,21 +260,16 @@ def api_system_stats():
             'failed_processing': failed_transcripts
         }
 
-        return jsonify({'system_stats': system_stats}), 200
+        response_data = {'system_stats': system_stats}
+        logger.debug(f"System stats response: {response_data}")
+        return jsonify(response_data), 200
 
     except Exception as e:
-        logger.error(f"Error getting system stats: {str(e)}")
+        logger.error(f"Critical error getting system stats: {str(e)}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
-        # Return default stats structure instead of error
-        return jsonify({
-            'system_stats': {
-                'total_clients': 0,
-                'total_transcripts': 0,
-                'pending_processing': 0,
-                'failed_processing': 0
-            }
-        }), 200
+        # Always return valid structure
+        return jsonify(default_response), 200
 
 @app.route('/api/manual-scan', methods=['POST'])
 def manual_scan():
@@ -360,28 +386,37 @@ def create_client():
 def get_processing_logs():
     """Get recent processing logs"""
     try:
+        # Ensure database session is fresh
+        db.session.close()
+        
         logs = db.session.query(ProcessingLog)\
             .order_by(ProcessingLog.created_at.desc())\
             .limit(50).all()
 
         log_data = []
         for log in logs:
-            log_data.append({
-                'id': log.id,
-                'activity_type': log.activity_type or 'unknown',
-                'status': log.status or 'info',
-                'message': log.message or 'No message',
-                'created_at': log.created_at.isoformat() if log.created_at else datetime.now(timezone.utc).isoformat(),
-                'transcript_id': log.transcript_id
-            })
+            try:
+                log_entry = {
+                    'id': log.id,
+                    'activity_type': log.activity_type or 'unknown',
+                    'status': log.status or 'info',
+                    'message': log.message or 'No message',
+                    'created_at': log.created_at.isoformat() if log.created_at else datetime.now(timezone.utc).isoformat(),
+                    'transcript_id': log.transcript_id
+                }
+                log_data.append(log_entry)
+            except Exception as e:
+                logger.warning(f"Error processing log entry {log.id}: {str(e)}")
+                continue
 
+        logger.debug(f"Processing logs response: {len(log_data)} entries")
         return jsonify(log_data), 200
 
     except Exception as e:
-        logger.error(f"Error getting processing logs: {str(e)}")
+        logger.error(f"Critical error getting processing logs: {str(e)}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
-        # Return empty array instead of object
+        # Always return empty array, never an object
         return jsonify([]), 200
 
 @app.route('/api/scan-dropbox', methods=['POST'])

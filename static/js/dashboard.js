@@ -43,7 +43,9 @@ function loadSystemStats() {
         })
         .then(data => {
             console.log('System stats loaded:', data);
-            if (data && data.system_stats) {
+            
+            // Validate response structure
+            if (data && typeof data === 'object' && data.system_stats && typeof data.system_stats === 'object') {
                 updateSystemStats(data.system_stats);
             } else {
                 console.warn('Invalid system stats data format:', data);
@@ -251,8 +253,17 @@ function loadProcessingLogs() {
     .then(data => {
         console.log('Processing logs loaded:', data);
         
-        // Ensure data is an array
-        const logs = Array.isArray(data) ? data : [];
+        // Validate that data is an array, handle edge cases
+        let logs = [];
+        if (Array.isArray(data)) {
+            logs = data;
+        } else if (data && typeof data === 'object') {
+            console.warn('Processing logs returned object instead of array:', data);
+            logs = [];
+        } else {
+            console.warn('Processing logs returned unexpected data type:', typeof data, data);
+            logs = [];
+        }
         
         // Update the activity feed
         const activityFeed = document.querySelector('.activity-feed');
@@ -261,28 +272,32 @@ function loadProcessingLogs() {
             
             if (logs.length > 0) {
                 logs.slice(0, 10).forEach(log => {
-                    const icon = log.status === 'success' ? 'fas fa-check-circle text-success' :
-                                log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
-                                'fas fa-info-circle text-info';
+                    try {
+                        const icon = log.status === 'success' ? 'fas fa-check-circle text-success' :
+                                    log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
+                                    'fas fa-info-circle text-info';
 
-                    const date = log.created_at ? new Date(log.created_at).toLocaleString() : 'Unknown time';
-                    const message = log.message || 'No message available';
+                        const date = log.created_at ? new Date(log.created_at).toLocaleString() : 'Unknown time';
+                        const message = log.message || 'No message available';
 
-                    html += `
-                        <div class="activity-item mb-3 pb-3 border-bottom">
-                            <div class="d-flex align-items-start">
-                                <div class="activity-icon me-3">
-                                    <i class="${icon}"></i>
-                                </div>
-                                <div class="activity-content flex-grow-1">
-                                    <div class="activity-message">${message}</div>
-                                    <div class="activity-meta text-muted small">
-                                        <i class="fas fa-clock me-1"></i>${date}
+                        html += `
+                            <div class="activity-item mb-3 pb-3 border-bottom">
+                                <div class="d-flex align-items-start">
+                                    <div class="activity-icon me-3">
+                                        <i class="${icon}"></i>
+                                    </div>
+                                    <div class="activity-content flex-grow-1">
+                                        <div class="activity-message">${message}</div>
+                                        <div class="activity-meta text-muted small">
+                                            <i class="fas fa-clock me-1"></i>${date}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    } catch (logError) {
+                        console.warn('Error processing individual log entry:', logError, log);
+                    }
                 });
             }
 
