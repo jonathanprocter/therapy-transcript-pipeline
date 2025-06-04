@@ -5,6 +5,9 @@ from services.dropbox_service import DropboxService
 from services.ai_service import AIService
 from services.notion_service import NotionService
 from services.analytics_service import AnalyticsService
+from services.emotional_analysis import EmotionalAnalysis
+from services.visualization_service import VisualizationService
+from services.email_summary_service import EmailSummaryService
 from datetime import datetime, timezone
 import logging
 import json
@@ -17,12 +20,18 @@ try:
     ai_service = AIService()
     notion_service = NotionService()
     analytics_service = AnalyticsService()
+    emotional_analyzer = EmotionalAnalysis()
+    visualization_service = VisualizationService()
+    email_summary_service = EmailSummaryService()
 except Exception as e:
     logger.error(f"Error initializing services: {str(e)}")
     dropbox_service = None
     ai_service = None
     notion_service = None
     analytics_service = None
+    emotional_analyzer = None
+    visualization_service = None
+    email_summary_service = None
 
 @app.route('/')
 def dashboard():
