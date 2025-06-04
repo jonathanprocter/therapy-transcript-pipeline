@@ -42,8 +42,9 @@ def dashboard():
         
         client_stats = []
         for client in clients:
-            transcript_count = len(client.transcripts)
-            latest_session = max([t.session_date for t in client.transcripts if t.session_date], default=None)
+            transcripts = db.session.query(Transcript).filter_by(client_id=client.id).all()
+            transcript_count = len(transcripts)
+            latest_session = max([t.session_date for t in transcripts if t.session_date], default=None)
             
             client_stats.append({
                 'id': client.id,
