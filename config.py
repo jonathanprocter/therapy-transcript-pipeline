@@ -9,7 +9,7 @@ class Config:
     
     # AI Provider API Keys
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
-    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY') 
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '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') 
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyDKSugqYPsqYMrrAiXh-1bAPf992gVrGbk')
     
     # Notion configuration
