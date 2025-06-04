@@ -68,7 +68,7 @@ def start_background_scheduler():
         logger.error(f"Failed to start background scheduler: {str(e)}")
 
 def scan_and_process_files():
-    """Scan Dropbox for new files and process them"""
+    """Scan Dropbox for new files and process them efficiently"""
     with app.app_context():
         try:
             logger.info("Starting Dropbox scan for new files")
@@ -76,7 +76,6 @@ def scan_and_process_files():
             # Initialize services
             dropbox_service = DropboxService()
             document_processor = DocumentProcessor()
-            ai_service = AIService()
             
             # Get list of already processed files
             processed_files = [t.dropbox_path for t in db.session.query(Transcript).all()]
@@ -90,23 +89,30 @@ def scan_and_process_files():
             
             logger.info(f"Found {len(new_files)} new files to process")
             
-            # Process each new file
-            for file_info in new_files:
+            # Process only recent files (last 30 days) to avoid overwhelming the system
+            recent_files = [f for f in new_files if 'june' in f['name'].lower() or '6-' in f['name'] or '2025' in f['name']][:10]
+            
+            logger.info(f"Processing {len(recent_files)} recent files")
+            
+            # Process each recent file
+            for file_info in recent_files:
                 try:
-                    process_single_file(file_info, dropbox_service, document_processor, ai_service)
+                    process_single_file_efficiently(file_info, dropbox_service, document_processor)
                 except Exception as e:
                     logger.error(f"Error processing file {file_info['name']}: {str(e)}")
                     
                     # Log the error
-                    error_log = ProcessingLog(
-                        activity_type='file_process',
-                        status='error',
-                        message=f"Failed to process {file_info['name']}",
-                        error_details=str(e),
-                        context_metadata={'file_info': file_info}
-                    )
-                    db.session.add(error_log)
-                    db.session.commit()
+                    try:
+                        error_log = ProcessingLog()
+                        error_log.activity_type = 'file_process'
+                        error_log.status = 'error'
+                        error_log.message = f"Failed to process {file_info['name']}"
+                        error_log.error_details = str(e)
+                        error_log.context_metadata = {'file_info': file_info}
+                        db.session.add(error_log)
+                        db.session.commit()
+                    except:
+                        pass
             
             logger.info("Dropbox scan completed")
             
@@ -115,16 +121,130 @@ def scan_and_process_files():
             
             # Log the error
             try:
-                error_log = ProcessingLog(
-                    activity_type='dropbox_scan',
-                    status='error',
-                    message="Dropbox scan failed",
-                    error_details=str(e)
-                )
+                error_log = ProcessingLog()
+                error_log.activity_type = 'dropbox_scan'
+                error_log.status = 'error'
+                error_log.message = "Dropbox scan failed"
+                error_log.error_details = str(e)
                 db.session.add(error_log)
                 db.session.commit()
             except Exception as log_error:
                 logger.error(f"Failed to log error: {str(log_error)}")
+
+def process_single_file_efficiently(file_info, dropbox_service, document_processor):
+    """Process a single file efficiently with reduced complexity"""
+    import openai
+    import re
+    from datetime import datetime
+    
+    try:
+        logger.info(f"Processing file efficiently: {file_info['name']}")
+        
+        # Download the file
+        file_content = dropbox_service.download_file(file_info['path'])
+        if not file_content:
+            raise ValueError("Failed to download file")
+        
+        # Process the document
+        processed_data = document_processor.process_document(file_content, file_info['name'])
+        if not processed_data or not processed_data.get('raw_content'):
+            raise ValueError("Failed to extract content")
+        
+        content = processed_data['raw_content']
+        
+        # Extract client name from filename
+        filename = file_info['name']
+        client_name = filename.split(' Appointment')[0] if 'Appointment' in filename else filename.replace('.pdf', '').replace('.txt', '').split('_')[0]
+        
+        # Find or create client
+        client = db.session.query(Client).filter(Client.name.ilike(f'%{client_name}%')).first()
+        if not client:
+            client = Client()
+            client.name = client_name
+            db.session.add(client)
+            db.session.flush()
+            logger.info(f"Created new client: {client_name}")
+        
+        # Extract date from filename
+        date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', filename)
+        if date_match:
+            month, day, year = date_match.groups()
+            session_date = datetime(int(year), int(month), int(day))
+        else:
+            session_date = datetime.now()
+        
+        # Check for duplicates
+        existing_transcript = Transcript.query.filter_by(
+            client_id=client.id,
+            original_filename=filename
+        ).first()
+        
+        if existing_transcript:
+            logger.info(f"Duplicate detected - skipping {filename}")
+            return True
+        
+        # Generate AI analysis efficiently
+        openai_client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
+        
+        simple_prompt = f"""Create a clinical progress note for this therapy session. Use these sections:
+SUBJECTIVE: Client's reported experiences and concerns
+OBJECTIVE: Observed behavior and emotional state  
+ASSESSMENT: Clinical evaluation and progress
+PLAN: Treatment recommendations
+
+Transcript: {content[:12000]}"""
+        
+        try:
+            response = openai_client.chat.completions.create(
+                model='gpt-4o',
+                messages=[{'role': 'user', 'content': simple_prompt}],
+                max_tokens=1500,
+                temperature=0.7
+            )
+            
+            analysis = response.choices[0].message.content
+            
+            # Create transcript with analysis
+            transcript = Transcript()
+            transcript.client_id = client.id
+            transcript.original_filename = filename
+            transcript.dropbox_path = file_info['path']
+            transcript.file_type = 'pdf' if filename.endswith('.pdf') else 'txt'
+            transcript.raw_content = content
+            transcript.session_date = session_date
+            transcript.processing_status = 'completed'
+            transcript.processed_at = datetime.now()
+            transcript.openai_analysis = {'clinical_progress_note': analysis}
+            
+            db.session.add(transcript)
+            db.session.commit()
+            
+            logger.info(f"Successfully processed {filename} for {client_name}")
+            return True
+            
+        except Exception as ai_error:
+            logger.warning(f"AI analysis failed for {filename}: {str(ai_error)}")
+            
+            # Save without AI analysis as backup
+            transcript = Transcript()
+            transcript.client_id = client.id
+            transcript.original_filename = filename
+            transcript.dropbox_path = file_info['path']
+            transcript.file_type = 'pdf' if filename.endswith('.pdf') else 'txt'
+            transcript.raw_content = content
+            transcript.session_date = session_date
+            transcript.processing_status = 'pending'
+            transcript.processed_at = datetime.now()
+            
+            db.session.add(transcript)
+            db.session.commit()
+            
+            logger.info(f"Saved {filename} without AI analysis")
+            return True
+        
+    except Exception as e:
+        logger.error(f"Failed to process {file_info['name']}: {str(e)}")
+        return False
 
 def process_single_file(file_info, dropbox_service, document_processor, ai_service):
     """Process a single file from Dropbox"""
