@@ -338,6 +338,229 @@ class NotionService:
         except Exception as e:
             logger.error(f"Error creating client database: {str(e)}")
             return None
+
+    def create_transcript_page(self, database_id: str, transcript_data: Dict) -> Optional[str]:
+        """Create a transcript page in the specified Notion database"""
+        if not self.headers:
+            logger.error("Notion not configured")
+            return None
+        
+        try:
+            # Extract data from transcript_data
+            client_name = transcript_data.get('client_name', 'Unknown Client')
+            session_date = transcript_data.get('session_date')
+            filename = transcript_data.get('filename', 'Unknown File')
+            openai_analysis = transcript_data.get('openai_analysis', {})
+            anthropic_analysis = transcript_data.get('anthropic_analysis', {})
+            gemini_analysis = transcript_data.get('gemini_analysis', {})
+            therapy_insights = transcript_data.get('therapy_insights', {})
+            sentiment_score = transcript_data.get('sentiment_score', 0.5)
+            key_themes = transcript_data.get('key_themes', [])
+            
+            # Format session date
+            if session_date:
+                if isinstance(session_date, str):
+                    formatted_date = session_date
+                else:
+                    formatted_date = session_date.strftime('%Y-%m-%d')
+            else:
+                formatted_date = datetime.now().strftime('%Y-%m-%d')
+            
+            # Create page properties
+            properties = {
+                "Session Title": {
+                    "title": [
+                        {
+                            "text": {
+                                "content": f"Session {formatted_date} - {client_name}"
+                            }
+                        }
+                    ]
+                },
+                "Date": {
+                    "date": {
+                        "start": formatted_date
+                    }
+                },
+                "Session Type": {
+                    "select": {
+                        "name": "Individual"
+                    }
+                },
+                "Status": {
+                    "select": {
+                        "name": "Completed"
+                    }
+                }
+            }
+            
+            # Add sentiment and themes if available
+            if key_themes:
+                properties["Key Themes"] = {
+                    "multi_select": [{"name": theme} for theme in key_themes[:5]]  # Limit to 5 themes
+                }
+            
+            if sentiment_score:
+                properties["Intensity"] = {
+                    "number": float(sentiment_score)
+                }
+            
+            # Determine primary emotion from therapy insights
+            primary_emotion = "Content"
+            if therapy_insights and isinstance(therapy_insights, dict):
+                emotion_data = therapy_insights.get('emotional_state', {})
+                if emotion_data and isinstance(emotion_data, dict):
+                    primary_emotion = emotion_data.get('primary_emotion', 'Content').title()
+            
+            properties["Primary Emotion"] = {
+                "select": {
+                    "name": primary_emotion
+                }
+            }
+            
+            # Create content blocks from AI analyses
+            content_blocks = []
+            
+            # Add OpenAI Analysis
+            if openai_analysis and isinstance(openai_analysis, dict):
+                openai_content = openai_analysis.get('clinical_progress_note', 
+                                                   openai_analysis.get('analysis', 
+                                                                      str(openai_analysis)))
+                if openai_content:
+                    content_blocks.append({
+                        "object": "block",
+                        "type": "heading_2",
+                        "heading_2": {
+                            "rich_text": [{"type": "text", "text": {"content": "OpenAI Clinical Analysis"}}]
+                        }
+                    })
+                    
+                    # Split content into chunks
+                    chunks = self._split_content_into_chunks(str(openai_content))
+                    for chunk in chunks:
+                        content_blocks.append({
+                            "object": "block",
+                            "type": "paragraph",
+                            "paragraph": {
+                                "rich_text": [{"type": "text", "text": {"content": chunk}}]
+                            }
+                        })
+            
+            # Add Anthropic Analysis
+            if anthropic_analysis and isinstance(anthropic_analysis, dict):
+                anthropic_content = anthropic_analysis.get('clinical_progress_note', 
+                                                         anthropic_analysis.get('analysis', 
+                                                                               str(anthropic_analysis)))
+                if anthropic_content:
+                    content_blocks.append({
+                        "object": "block",
+                        "type": "heading_2",
+                        "heading_2": {
+                            "rich_text": [{"type": "text", "text": {"content": "Anthropic Clinical Analysis"}}]
+                        }
+                    })
+                    
+                    chunks = self._split_content_into_chunks(str(anthropic_content))
+                    for chunk in chunks:
+                        content_blocks.append({
+                            "object": "block",
+                            "type": "paragraph",
+                            "paragraph": {
+                                "rich_text": [{"type": "text", "text": {"content": chunk}}]
+                            }
+                        })
+            
+            # Add Gemini Analysis
+            if gemini_analysis and isinstance(gemini_analysis, dict):
+                gemini_content = gemini_analysis.get('clinical_progress_note', 
+                                                   gemini_analysis.get('analysis', 
+                                                                      str(gemini_analysis)))
+                if gemini_content:
+                    content_blocks.append({
+                        "object": "block",
+                        "type": "heading_2",
+                        "heading_2": {
+                            "rich_text": [{"type": "text", "text": {"content": "Gemini Clinical Analysis"}}]
+                        }
+                    })
+                    
+                    chunks = self._split_content_into_chunks(str(gemini_content))
+                    for chunk in chunks:
+                        content_blocks.append({
+                            "object": "block",
+                            "type": "paragraph",
+                            "paragraph": {
+                                "rich_text": [{"type": "text", "text": {"content": chunk}}]
+                            }
+                        })
+            
+            # Create the page
+            page_data = {
+                "parent": {"database_id": database_id},
+                "properties": properties,
+                "children": content_blocks
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/pages",
+                headers=self.headers,
+                json=page_data
+            )
+            
+            if response.status_code == 200:
+                page_id = response.json().get('id')
+                logger.info(f"Created transcript page: {page_id}")
+                return page_id
+            else:
+                error_msg = f"Failed to create transcript page: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating transcript page: {str(e)}")
+            return None
+
+    def _split_content_into_chunks(self, content: str, max_chunk_size: int = 1900) -> List[str]:
+        """Split content into chunks suitable for Notion blocks"""
+        if len(content) <= max_chunk_size:
+            return [content]
+        
+        chunks = []
+        remaining = content
+        
+        while remaining:
+            if len(remaining) <= max_chunk_size:
+                chunks.append(remaining)
+                break
+            
+            # Find good break point
+            chunk = remaining[:max_chunk_size]
+            break_point = max_chunk_size
+            
+            # Try to break at sentence end
+            for i in range(len(chunk) - 1, max(0, len(chunk) - 200), -1):
+                if chunk[i] in '.!?':
+                    break_point = i + 1
+                    break
+            
+            # If no sentence break, try paragraph
+            if break_point == max_chunk_size:
+                for i in range(len(chunk) - 1, max(0, len(chunk) - 200), -1):
+                    if chunk[i] == '\n':
+                        break_point = i + 1
+                        break
+            
+            # If no paragraph break, try space
+            if break_point == max_chunk_size:
+                for i in range(len(chunk) - 1, max(0, len(chunk) - 100), -1):
+                    if chunk[i] == ' ':
+                        break_point = i + 1
+                        break
+            
+            chunks.append(remaining[:break_point])
+            remaining = remaining[break_point:]
+        
+        return chunks
         
         try:
             # First, we need a parent page. For this example, we'll assume there's a main workspace page
