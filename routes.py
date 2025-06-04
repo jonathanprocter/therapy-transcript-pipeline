@@ -459,3 +459,178 @@ def upload():
             flash(f'Error processing file: {str(e)}', 'error')
     
     return render_template('upload.html')
+
+@app.route('/client/<int:client_id>/visualization')
+def client_visualization(client_id):
+    """Dynamic longitudinal visualization dashboard for specific client"""
+    try:
+        client = db.session.get(Client, client_id)
+        if not client:
+            flash('Client not found', 'error')
+            return redirect(url_for('dashboard'))
+        
+        # Get all transcripts for this client
+        transcripts = Transcript.query.filter_by(client_id=client_id).order_by(Transcript.session_date).all()
+        
+        if not transcripts:
+            flash('No session data available for visualization', 'info')
+            return redirect(url_for('client_detail', client_id=client_id))
+        
+        # Generate longitudinal emotional data
+        session_data = []
+        for transcript in transcripts:
+            # Extract emotional analysis if available
+            emotional_data = None
+            if hasattr(transcript, 'emotional_analysis') and transcript.emotional_analysis:
+                try:
+                    emotional_data = json.loads(transcript.emotional_analysis) if isinstance(transcript.emotional_analysis, str) else transcript.emotional_analysis
+                except json.JSONDecodeError:
+                    emotional_data = None
+            
+            session_data.append({
+                'transcript_id': transcript.id,
+                'session_date': transcript.session_date.isoformat() if transcript.session_date else None,
+                'emotional_analysis': emotional_data,
+                'ai_analysis': {
+                    'openai_analysis': transcript.openai_analysis,
+                    'anthropic_analysis': transcript.anthropic_analysis,
+                    'gemini_analysis': transcript.gemini_analysis
+                }
+            })
+        
+        # Generate visualization dashboard
+        if visualization_service:
+            client_data = {'name': client.name, 'id': client.id}
+            dashboard_data = visualization_service.generate_longitudinal_dashboard(client_data, session_data)
+        else:
+            dashboard_data = {'error': 'Visualization service unavailable'}
+        
+        # Generate longitudinal emotional analysis
+        if emotional_analyzer:
+            longitudinal_emotions = emotional_analyzer.generate_longitudinal_emotional_data(session_data)
+        else:
+            longitudinal_emotions = {'error': 'Emotional analysis service unavailable'}
+        
+        return render_template('client_visualization.html', 
+                             client=client, 
+                             dashboard_data=dashboard_data,
+                             longitudinal_emotions=longitudinal_emotions,
+                             session_count=len(transcripts))
+        
+    except Exception as e:
+        logger.error(f"Error generating client visualization: {str(e)}")
+        flash(f"Error generating visualization: {str(e)}", 'error')
+        return redirect(url_for('client_detail', client_id=client_id))
+
+@app.route('/transcript/<int:transcript_id>/adaptive-colors')
+def adaptive_color_ui(transcript_id):
+    """Adaptive color therapy UI based on emotional analysis"""
+    try:
+        transcript = db.session.get(Transcript, transcript_id)
+        if not transcript:
+            flash('Transcript not found', 'error')
+            return redirect(url_for('dashboard'))
+        
+        # Get or generate emotional analysis
+        emotional_data = None
+        if hasattr(transcript, 'emotional_analysis') and transcript.emotional_analysis:
+            try:
+                emotional_data = json.loads(transcript.emotional_analysis) if isinstance(transcript.emotional_analysis, str) else transcript.emotional_analysis
+            except json.JSONDecodeError:
+                emotional_data = None
+        
+        # If no emotional analysis exists, generate it
+        if not emotional_data and emotional_analyzer and transcript.raw_content:
+            ai_analysis = {
+                'openai_analysis': transcript.openai_analysis,
+                'anthropic_analysis': transcript.anthropic_analysis,
+                'gemini_analysis': transcript.gemini_analysis
+            }
+            emotional_data = emotional_analyzer.analyze_session_emotions(transcript.raw_content, ai_analysis)
+            
+            # Save emotional analysis to transcript (if column exists)
+            try:
+                transcript.emotional_analysis = json.dumps(emotional_data)
+                db.session.commit()
+            except Exception as e:
+                logger.warning(f"Could not save emotional analysis: {str(e)}")
+        
+        if not emotional_data:
+            emotional_data = {
+                'primary_emotion': 'neutral',
+                'intensity': 0.5,
+                'color_palette': {
+                    'primary': '#8E9AAF',
+                    'background': '#F8F9FA',
+                    'text': '#2C3E50'
+                }
+            }
+        
+        return render_template('adaptive_color_ui.html', 
+                             transcript=transcript,
+                             emotional_data=emotional_data)
+        
+    except Exception as e:
+        logger.error(f"Error loading adaptive color UI: {str(e)}")
+        flash(f"Error loading adaptive interface: {str(e)}", 'error')
+        return redirect(url_for('transcript_detail', transcript_id=transcript_id))
+
+@app.route('/transcript/<int:transcript_id>/email-summary', methods=['GET', 'POST'])
+def email_summary(transcript_id):
+    """Generate and send email summary for session review"""
+    try:
+        transcript = db.session.get(Transcript, transcript_id)
+        if not transcript:
+            flash('Transcript not found', 'error')
+            return redirect(url_for('dashboard'))
+        
+        if request.method == 'POST':
+            recipient_email = request.form.get('recipient_email')
+            smtp_username = request.form.get('smtp_username')
+            smtp_password = request.form.get('smtp_password')
+            
+            if not all([recipient_email, smtp_username, smtp_password]):
+                flash('All email fields are required', 'error')
+                return redirect(url_for('email_summary', transcript_id=transcript_id))
+            
+            # Generate email summary
+            if email_summary_service:
+                summary_data = email_summary_service.create_summary_for_transcript(transcript_id)
+                
+                if summary_data:
+                    # Send email
+                    success = email_summary_service.send_email_summary(
+                        summary_data, recipient_email, smtp_username, smtp_password
+                    )
+                    
+                    if success:
+                        flash('Email summary sent successfully', 'success')
+                    else:
+                        flash('Failed to send email summary', 'error')
+                else:
+                    flash('Failed to generate email summary', 'error')
+            else:
+                flash('Email service unavailable', 'error')
+            
+            return redirect(url_for('transcript_detail', transcript_id=transcript_id))
+        
+        # GET request - show email form with preview
+        if email_summary_service:
+            summary_data = email_summary_service.create_summary_for_transcript(transcript_id)
+            if summary_data:
+                email_preview = email_summary_service.format_email_summary(summary_data)
+            else:
+                email_preview = "Unable to generate email preview"
+        else:
+            summary_data = None
+            email_preview = "Email service unavailable"
+        
+        return render_template('email_summary.html', 
+                             transcript=transcript,
+                             email_preview=email_preview,
+                             summary_data=summary_data)
+        
+    except Exception as e:
+        logger.error(f"Error with email summary: {str(e)}")
+        flash(f"Error with email summary: {str(e)}", 'error')
+        return redirect(url_for('transcript_detail', transcript_id=transcript_id))
