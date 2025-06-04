@@ -72,10 +72,6 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pkill -f \"python.*main.py\" || true"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
 args = "python main.py"
 
 [[ports]]

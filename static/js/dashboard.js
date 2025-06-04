@@ -300,3 +300,59 @@ setInterval(() => {
 
 // Auto-refresh service status every 60 seconds
 setInterval(loadServiceStatus, 60000);
+
+function manualScan() {
+    const scanBtn = document.getElementById('manualScanBtn');
+    if (scanBtn) {
+        scanBtn.disabled = true;
+        scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
+    }
+
+    fetch('/api/manual-scan', { 
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+        .then(response => {
+            return response.json().then(data => {
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP error! status: ${response.status}`);
+                }
+                return data;
+            });
+        })
+        .then(data => {
+            showAlert(data.message || 'Scan completed successfully', 'success');
+
+            // Update new files count if available
+            if (data.new_files && data.new_files.length > 0) {
+                const countElement = document.getElementById('newFilesCount');
+                if (countElement) {
+                    countElement.textContent = `${data.new_files.length} new files detected`;
+                }
+            }
+
+            // Refresh data after a short delay
+            setTimeout(() => {
+                loadSystemStats();
+                loadProcessingLogs();
+            }, 2000);
+        })
+        .catch(error => {
+            console.error('Manual scan error:', error);
+            showAlert('Error performing manual scan: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            if (scanBtn) {
+                scanBtn.disabled = false;
+                scanBtn.innerHTML = '<i class="fas fa-sync me-2"></i>Manual Scan';
+            }
+        });
+}
+
+// Auto-refresh data every 60 seconds (reduced frequency)
+setInterval(() => {
+    updateSystemStats();
+    loadProcessingLogs();
+}, 60000);

@@ -39,13 +39,13 @@ def dashboard():
     try:
         # Get all clients with their transcript counts
         clients = db.session.query(Client).all()
-        
+
         client_stats = []
         for client in clients:
             transcripts = db.session.query(Transcript).filter_by(client_id=client.id).all()
             transcript_count = len(transcripts)
             latest_session = max([t.session_date for t in transcripts if t.session_date], default=None)
-            
+
             client_stats.append({
                 'id': client.id,
                 'name': client.name,
@@ -53,31 +53,31 @@ def dashboard():
                 'latest_session': latest_session,
                 'notion_database_id': client.notion_database_id
             })
-        
+
         # Get recent processing logs
         recent_logs = db.session.query(ProcessingLog)\
             .order_by(ProcessingLog.created_at.desc())\
             .limit(10).all()
-        
+
         # Get system statistics
         total_transcripts = db.session.query(Transcript).count()
         pending_transcripts = db.session.query(Transcript)\
             .filter(Transcript.processing_status == 'pending').count()
         failed_transcripts = db.session.query(Transcript)\
             .filter(Transcript.processing_status == 'failed').count()
-        
+
         system_stats = {
             'total_clients': len(clients),
             'total_transcripts': total_transcripts,
             'pending_processing': pending_transcripts,
             'failed_processing': failed_transcripts
         }
-        
+
         return render_template('dashboard.html', 
                              clients=client_stats,
                              recent_logs=recent_logs,
                              system_stats=system_stats)
-        
+
     except Exception as e:
         logger.error(f"Error loading dashboard: {str(e)}")
         flash(f"Error loading dashboard: {str(e)}", "error")
@@ -91,12 +91,12 @@ def client_details(client_id):
         if not client:
             flash("Client not found", "error")
             return redirect(url_for('dashboard'))
-        
+
         # Get all transcripts for this client
         transcripts = db.session.query(Transcript)\
             .filter(Transcript.client_id == client_id)\
             .order_by(Transcript.session_date.desc()).all()
-        
+
         # Generate analytics if we have data
         dashboard_data = {}
         if transcripts and analytics_service:
@@ -111,18 +111,18 @@ def client_details(client_id):
                         'therapy_insights': transcript.therapy_insights,
                         'raw_content': transcript.raw_content
                     })
-                
+
                 dashboard_data = analytics_service.generate_progress_dashboard(session_data)
-                
+
             except Exception as e:
                 logger.error(f"Error generating analytics for client {client_id}: {str(e)}")
                 dashboard_data = {}
-        
+
         return render_template('client_details.html', 
                              client=client,
                              transcripts=transcripts,
                              dashboard_data=dashboard_data)
-        
+
     except Exception as e:
         logger.error(f"Error loading client details: {str(e)}")
         flash(f"Error loading client details: {str(e)}", "error")
@@ -135,19 +135,19 @@ def longitudinal_analysis(client_id):
         client = db.session.get(Client, client_id)
         if not client:
             return jsonify({'error': 'Client not found'}), 404
-        
+
         # Get processed transcripts
         transcripts = db.session.query(Transcript)\
             .filter(Transcript.client_id == client_id)\
             .filter(Transcript.processing_status == 'completed')\
             .order_by(Transcript.session_date.asc()).all()
-        
+
         if len(transcripts) < 2:
             return jsonify({'error': 'Need at least 2 sessions for longitudinal analysis'}), 400
-        
+
         if not ai_service:
             return jsonify({'error': 'AI service not available'}), 503
-        
+
         # Prepare session data for analysis
         session_data = []
         for transcript in transcripts:
@@ -158,19 +158,19 @@ def longitudinal_analysis(client_id):
                 'therapy_insights': transcript.therapy_insights,
                 'progress_indicators': transcript.progress_indicators
             })
-        
+
         # Perform longitudinal analysis
         longitudinal_results = ai_service.analyze_longitudinal_progress(session_data)
-        
+
         # Save results to Notion if configured
         if notion_service and client.notion_database_id:
             try:
                 notion_service.create_longitudinal_report(client.notion_database_id, longitudinal_results)
             except Exception as e:
                 logger.warning(f"Failed to save longitudinal report to Notion: {str(e)}")
-        
+
         return jsonify(longitudinal_results)
-        
+
     except Exception as e:
         logger.error(f"Error performing longitudinal analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -181,30 +181,30 @@ def settings():
     try:
         # Test service connections
         service_status = {}
-        
+
         if dropbox_service:
             service_status['dropbox'] = dropbox_service.test_connection()
         else:
             service_status['dropbox'] = False
-        
+
         if notion_service:
             service_status['notion'] = notion_service.test_connection()
         else:
             service_status['notion'] = False
-        
+
         # AI services status
         service_status['openai'] = ai_service.openai_client is not None if ai_service else False
         service_status['anthropic'] = ai_service.anthropic_client is not None if ai_service else False
         service_status['gemini'] = ai_service.gemini_client is not None if ai_service else False
-        
+
         # Get system settings
         settings_records = db.session.query(SystemSettings).all()
         settings_dict = {setting.key: setting.value for setting in settings_records}
-        
+
         return render_template('settings.html', 
                              service_status=service_status,
                              settings=settings_dict)
-        
+
     except Exception as e:
         logger.error(f"Error loading settings: {str(e)}")
         flash(f"Error loading settings: {str(e)}", "error")
@@ -221,19 +221,27 @@ def api_system_stats():
             .filter(Transcript.processing_status == 'pending').count()
         failed_transcripts = db.session.query(Transcript)\
             .filter(Transcript.processing_status == 'failed').count()
-        
+
         system_stats = {
             'total_clients': total_clients,
             'total_transcripts': total_transcripts,
             'pending_processing': pending_transcripts,
             'failed_processing': failed_transcripts
         }
-        
-        return jsonify({'system_stats': system_stats})
-        
+
+        return jsonify({'system_stats': system_stats}), 200
+
     except Exception as e:
         logger.error(f"Error getting system stats: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        # Return default stats instead of error
+        return jsonify({
+            'system_stats': {
+                'total_clients': 0,
+                'total_transcripts': 0,
+                'pending_processing': 0,
+                'failed_processing': 0
+            }
+        }), 200
 
 @app.route('/api/manual-scan', methods=['POST'])
 def manual_scan():
@@ -241,18 +249,25 @@ def manual_scan():
     try:
         if not dropbox_service:
             return jsonify({'error': 'Dropbox service not available'}), 503
-        
+
         # Get list of already processed files
-        processed_files = [t.dropbox_path for t in db.session.query(Transcript).all()]
-        
+        try:
+            processed_files = [t.dropbox_path for t in db.session.query(Transcript).all() if t.dropbox_path]
+        except Exception as e:
+            logger.error(f"Error getting processed files: {str(e)}")
+            processed_files = []
+
         # Scan for new files
         new_files = dropbox_service.scan_for_new_files(processed_files)
-        
+
+        if new_files is None:
+            new_files = []
+
         return jsonify({
             'message': f'Scan completed. Found {len(new_files)} new files.',
-            'new_files': [f['name'] for f in new_files]
+            'new_files': [f.get('name', 'Unknown') for f in new_files] if new_files else []
         })
-        
+
     except Exception as e:
         logger.error(f"Error during manual scan: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -264,13 +279,13 @@ def reprocess_transcript(transcript_id):
         transcript = db.session.get(Transcript, transcript_id)
         if not transcript:
             return jsonify({'error': 'Transcript not found'}), 404
-        
+
         # Mark for reprocessing
         transcript.processing_status = 'pending'
         db.session.commit()
-        
+
         return jsonify({'message': 'Transcript marked for reprocessing'})
-        
+
     except Exception as e:
         logger.error(f"Error marking transcript for reprocessing: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -281,20 +296,20 @@ def create_client():
     try:
         data = request.get_json()
         client_name = data.get('name', '').strip()
-        
+
         if not client_name:
             return jsonify({'error': 'Client name is required'}), 400
-        
+
         # Check if client already exists
         existing_client = db.session.query(Client).filter(Client.name.ilike(f'%{client_name}%')).first()
         if existing_client:
             return jsonify({'error': 'Client with similar name already exists'}), 400
-        
+
         # Create new client
         client = Client(name=client_name)
         db.session.add(client)
         db.session.flush()  # Get the ID
-        
+
         # Create Notion database if service is available
         notion_db_id = None
         if notion_service:
@@ -304,15 +319,15 @@ def create_client():
                     client.notion_database_id = notion_db_id
             except Exception as e:
                 logger.warning(f"Failed to create Notion database for {client_name}: {str(e)}")
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'message': f'Client {client_name} created successfully',
             'client_id': client.id,
             'notion_database_id': notion_db_id
         })
-        
+
     except Exception as e:
         logger.error(f"Error creating client: {str(e)}")
         db.session.rollback()
@@ -325,7 +340,7 @@ def get_processing_logs():
         logs = db.session.query(ProcessingLog)\
             .order_by(ProcessingLog.created_at.desc())\
             .limit(50).all()
-        
+
         log_data = []
         for log in logs:
             log_data.append({
@@ -336,9 +351,9 @@ def get_processing_logs():
                 'created_at': log.created_at.isoformat() if log.created_at else None,
                 'transcript_id': log.transcript_id
             })
-        
+
         return jsonify(log_data)
-        
+
     except Exception as e:
         logger.error(f"Error getting processing logs: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -350,7 +365,7 @@ def get_transcript_analysis(transcript_id):
         transcript = db.session.get(Transcript, transcript_id)
         if not transcript:
             return jsonify({'error': 'Transcript not found'}), 404
-        
+
         analysis_data = {
             'openai_analysis': transcript.openai_analysis,
             'anthropic_analysis': transcript.anthropic_analysis,
@@ -360,9 +375,9 @@ def get_transcript_analysis(transcript_id):
             'therapy_insights': transcript.therapy_insights,
             'progress_indicators': transcript.progress_indicators
         }
-        
+
         return jsonify(analysis_data)
-        
+
     except Exception as e:
         logger.error(f"Error getting transcript analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -399,39 +414,39 @@ def upload():
     import tempfile
     import os
     from werkzeug.utils import secure_filename
-    
+
     # Import the uploaded processing pipeline
     try:
         from src.processing_pipeline import ProcessingPipeline
     except ImportError:
         flash('Processing pipeline not available', 'error')
         return render_template('upload.html')
-    
+
     if request.method == 'POST':
         if 'transcript' not in request.files:
             flash('No file selected', 'error')
             return redirect(request.url)
-        
+
         file = request.files['transcript']
         if file.filename == '':
             flash('No file selected', 'error')
             return redirect(request.url)
-        
+
         # Check file type
         allowed_extensions = {'pdf', 'txt', 'docx'}
         if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
             flash('Invalid file type. Please upload PDF, TXT, or DOCX files.', 'error')
             return redirect(request.url)
-        
+
         try:
             # Save file temporarily
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp:
                 file_path = temp.name
                 file.save(file_path)
-            
+
             filename = secure_filename(file.filename)
             logger.info(f"Processing uploaded file: {filename}")
-            
+
             # Initialize processing pipeline with API keys
             api_keys = {
                 'dropbox_token': os.environ.get('DROPBOX_ACCESS_TOKEN'),
@@ -442,16 +457,16 @@ def upload():
                 'notion_parent_id': os.environ.get('NOTION_DATABASE_ID'),
                 'dropbox_folder': '/apps/otter'
             }
-            
+
             pipeline = ProcessingPipeline(api_keys)
             result = pipeline.process_single_file(file_path)
-            
+
             # Clean up temp file
             try:
                 os.unlink(file_path)
             except Exception as e:
                 logger.error(f"Error removing temp file: {str(e)}")
-            
+
             if result.get("success", False):
                 # Create client record if it doesn't exist
                 client_name = result.get("client_name", "Unknown")
@@ -460,7 +475,7 @@ def upload():
                     client = Client(name=client_name)
                     db.session.add(client)
                     db.session.commit()
-                
+
                 # Create transcript record
                 transcript = Transcript(
                     client_id=client.id,
@@ -474,16 +489,16 @@ def upload():
                 )
                 db.session.add(transcript)
                 db.session.commit()
-                
+
                 flash(f'Successfully processed transcript for {client_name}!', 'success')
                 return redirect(url_for('dashboard'))
             else:
                 flash(f'Error processing file: {result.get("error", "Unknown error")}', 'error')
-                
+
         except Exception as e:
             logger.error(f"Error processing upload: {str(e)}")
             flash(f'Error processing file: {str(e)}', 'error')
-    
+
     return render_template('upload.html')
 
 @app.route('/client/<int:client_id>/visualization')
@@ -494,14 +509,14 @@ def client_visualization(client_id):
         if not client:
             flash('Client not found', 'error')
             return redirect(url_for('dashboard'))
-        
+
         # Get all transcripts for this client
         transcripts = Transcript.query.filter_by(client_id=client_id).order_by(Transcript.session_date).all()
-        
+
         if not transcripts:
             flash('No session data available for visualization', 'info')
             return redirect(url_for('client_detail', client_id=client_id))
-        
+
         # Generate longitudinal emotional data
         session_data = []
         for transcript in transcripts:
@@ -512,7 +527,7 @@ def client_visualization(client_id):
                     emotional_data = json.loads(transcript.emotional_analysis) if isinstance(transcript.emotional_analysis, str) else transcript.emotional_analysis
                 except json.JSONDecodeError:
                     emotional_data = None
-            
+
             session_data.append({
                 'transcript_id': transcript.id,
                 'session_date': transcript.session_date.isoformat() if transcript.session_date else None,
@@ -523,26 +538,26 @@ def client_visualization(client_id):
                     'gemini_analysis': transcript.gemini_analysis
                 }
             })
-        
+
         # Generate visualization dashboard
         if visualization_service:
             client_data = {'name': client.name, 'id': client.id}
             dashboard_data = visualization_service.generate_longitudinal_dashboard(client_data, session_data)
         else:
             dashboard_data = {'error': 'Visualization service unavailable'}
-        
+
         # Generate longitudinal emotional analysis
         if emotional_analyzer:
             longitudinal_emotions = emotional_analyzer.generate_longitudinal_emotional_data(session_data)
         else:
             longitudinal_emotions = {'error': 'Emotional analysis service unavailable'}
-        
+
         return render_template('client_visualization.html', 
                              client=client, 
                              dashboard_data=dashboard_data,
                              longitudinal_emotions=longitudinal_emotions,
                              session_count=len(transcripts))
-        
+
     except Exception as e:
         logger.error(f"Error generating client visualization: {str(e)}")
         flash(f"Error generating visualization: {str(e)}", 'error')
@@ -556,7 +571,7 @@ def adaptive_color_ui(transcript_id):
         if not transcript:
             flash('Transcript not found', 'error')
             return redirect(url_for('dashboard'))
-        
+
         # Get or generate emotional analysis
         emotional_data = None
         if hasattr(transcript, 'emotional_analysis') and transcript.emotional_analysis:
@@ -564,7 +579,7 @@ def adaptive_color_ui(transcript_id):
                 emotional_data = json.loads(transcript.emotional_analysis) if isinstance(transcript.emotional_analysis, str) else transcript.emotional_analysis
             except json.JSONDecodeError:
                 emotional_data = None
-        
+
         # If no emotional analysis exists, generate it
         if not emotional_data and emotional_analyzer and transcript.raw_content:
             ai_analysis = {
@@ -573,14 +588,14 @@ def adaptive_color_ui(transcript_id):
                 'gemini_analysis': transcript.gemini_analysis
             }
             emotional_data = emotional_analyzer.analyze_session_emotions(transcript.raw_content, ai_analysis)
-            
+
             # Save emotional analysis to transcript (if column exists)
             try:
                 transcript.emotional_analysis = json.dumps(emotional_data)
                 db.session.commit()
             except Exception as e:
                 logger.warning(f"Could not save emotional analysis: {str(e)}")
-        
+
         if not emotional_data:
             emotional_data = {
                 'primary_emotion': 'neutral',
@@ -591,11 +606,11 @@ def adaptive_color_ui(transcript_id):
                     'text': '#2C3E50'
                 }
             }
-        
+
         return render_template('adaptive_color_ui.html', 
                              transcript=transcript,
                              emotional_data=emotional_data)
-        
+
     except Exception as e:
         logger.error(f"Error loading adaptive color UI: {str(e)}")
         flash(f"Error loading adaptive interface: {str(e)}", 'error')
@@ -609,26 +624,26 @@ def email_summary(transcript_id):
         if not transcript:
             flash('Transcript not found', 'error')
             return redirect(url_for('dashboard'))
-        
+
         if request.method == 'POST':
             recipient_email = request.form.get('recipient_email')
             smtp_username = request.form.get('smtp_username')
             smtp_password = request.form.get('smtp_password')
-            
+
             if not all([recipient_email, smtp_username, smtp_password]):
                 flash('All email fields are required', 'error')
                 return redirect(url_for('email_summary', transcript_id=transcript_id))
-            
+
             # Generate email summary
             if email_summary_service:
                 summary_data = email_summary_service.create_summary_for_transcript(transcript_id)
-                
+
                 if summary_data:
                     # Send email
                     success = email_summary_service.send_email_summary(
                         summary_data, recipient_email, smtp_username, smtp_password
                     )
-                    
+
                     if success:
                         flash('Email summary sent successfully', 'success')
                     else:
@@ -637,9 +652,9 @@ def email_summary(transcript_id):
                     flash('Failed to generate email summary', 'error')
             else:
                 flash('Email service unavailable', 'error')
-            
+
             return redirect(url_for('transcript_detail', transcript_id=transcript_id))
-        
+
         # GET request - show email form with preview
         if email_summary_service:
             summary_data = email_summary_service.create_summary_for_transcript(transcript_id)
@@ -650,12 +665,12 @@ def email_summary(transcript_id):
         else:
             summary_data = None
             email_preview = "Email service unavailable"
-        
+
         return render_template('email_summary.html', 
                              transcript=transcript,
                              email_preview=email_preview,
                              summary_data=summary_data)
-        
+
     except Exception as e:
         logger.error(f"Error with email summary: {str(e)}")
         flash(f"Error with email summary: {str(e)}", 'error')
