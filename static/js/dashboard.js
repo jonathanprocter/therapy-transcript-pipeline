@@ -306,11 +306,13 @@ function loadProcessingLogs() {
     })
     .catch(error => {
         console.error('Error loading processing logs:', error);
-        // Show fallback message
+        // Ensure error is properly handled without throwing unhandled promise rejection
         const activityFeed = document.querySelector('.activity-feed');
         if (activityFeed) {
             activityFeed.innerHTML = '<div class="text-center py-4"><i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i><p class="text-muted mb-0">Unable to load activity logs</p></div>';
         }
+        // Return empty array to prevent further errors
+        return [];
     });
 }
 

@@ -224,16 +224,40 @@ class DropboxService:
             
         logger.info(f"Attempting to validate folder path: {folder_path}")
 
-        # List of possible folder variations to try
+        # Check if this is the first validation
+        if not hasattr(self, '_folder_validated'):
+            self._folder_validated = True
+            
+            # First try to create the folder if it doesn't exist
+            try:
+                # Check if the folder exists
+                result = self.client.files_list_folder(folder_path)
+                logger.info(f"Valid folder path found: '{folder_path}'")
+                self._validated_folder = folder_path
+                return folder_path
+            except dropbox.exceptions.ApiError as e:
+                if "not_found" in str(e).lower():
+                    logger.info(f"Folder '{folder_path}' not found, attempting to create it")
+                    try:
+                        self.client.files_create_folder_v2(folder_path)
+                        logger.info(f"Successfully created folder: '{folder_path}'")
+                        self._validated_folder = folder_path
+                        return folder_path
+                    except dropbox.exceptions.ApiError as create_e:
+                        logger.warning(f"Could not create folder '{folder_path}': {str(create_e)}")
+                        # Continue to try variations
+                else:
+                    logger.warning(f"Error accessing folder '{folder_path}': {str(e)}")
+
+        # List of possible folder variations to try if creation failed
         folder_variations = [
-            folder_path,  # Try original first
-            '/Apps/Otter',  # Capital A in Apps, capital O in Otter
+            '/Apps/Otter',  # Capital A in Apps, capital O in Otter (Dropbox app folder format)
             '/apps/Otter',  # lowercase apps, capital O in Otter  
             '/Apps/otter',  # Capital A in Apps, lowercase otter
             '/apps/otter',  # All lowercase
+            folder_path,    # Try original again
             '/Otter',       # Just Otter folder in root
-            '/otter',       # Just otter folder in root
-            ''              # Root folder as fallback
+            '/otter'        # Just otter folder in root
         ]
 
         for variation in folder_variations:
@@ -247,8 +271,9 @@ class DropboxService:
                 logger.debug(f"Folder '{variation}' not accessible: {str(e)}")
                 continue
 
-        # If no valid folder found, return empty string (root)
-        logger.warning(f"No valid folder path found for '{folder_path}', using root folder")
+        # As a last resort, use root folder but log this clearly
+        logger.error(f"Could not find or create any valid folder for '{folder_path}'. Using root folder as fallback.")
+        logger.error("This may indicate an issue with Dropbox permissions or the app folder setup.")
         self._validated_folder = ''
         return ''
 

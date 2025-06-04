@@ -450,6 +450,61 @@ def scan_dropbox():
         logger.error(f"Error in scan-dropbox endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/test-dropbox', methods=['POST'])
+def test_dropbox():
+    """Test Dropbox connection and return detailed status"""
+    try:
+        if not dropbox_service:
+            return jsonify({
+                'success': False,
+                'error': 'Dropbox service not initialized',
+                'details': 'Check Dropbox access token configuration'
+            }), 503
+
+        # Test connection
+        connection_test = dropbox_service.test_connection()
+        
+        if not connection_test:
+            return jsonify({
+                'success': False,
+                'error': 'Dropbox connection failed',
+                'details': 'Authentication or network issue'
+            }), 400
+
+        # Get account info
+        try:
+            account = dropbox_service.client.users_get_current_account()
+            account_name = account.name.display_name
+        except Exception as e:
+            account_name = 'Unknown'
+            logger.warning(f"Could not get account name: {str(e)}")
+
+        # Test folder access
+        try:
+            all_files = dropbox_service.list_files()
+            folder_status = f"Monitoring folder: {dropbox_service.monitor_folder}"
+            files_count = len(all_files)
+        except Exception as e:
+            folder_status = f"Error accessing folder: {str(e)}"
+            files_count = 0
+
+        return jsonify({
+            'success': True,
+            'account_name': account_name,
+            'folder_status': folder_status,
+            'files_found': files_count,
+            'monitor_folder': dropbox_service.monitor_folder,
+            'connection_timestamp': datetime.now(timezone.utc).isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Error testing Dropbox: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'details': 'Unexpected error during Dropbox test'
+        }), 500
+
 @app.route('/api/transcript/<int:transcript_id>/analysis')
 def get_transcript_analysis(transcript_id):
     """Get detailed analysis for a specific transcript"""
