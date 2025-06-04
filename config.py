@@ -4,17 +4,17 @@ class Config:
     """Configuration class for the therapy transcript processor"""
     
     # Dropbox configuration
-    DROPBOX_ACCESS_TOKEN = os.environ.get('DROPBOX_ACCESS_TOKEN', 'sl.u.AFwK_7uZ9TtOUxv795jrEPJGbLhOiNTOnNoRHIVutEqGK9cY_HJRqb3iKd7z5YHXEEPdpAVCbuoNaSMfNeexT_MDoxnY9M3HkFJR5SXudRsOJ8vcXfc3TnWEK3fqp-cRQChQjfyTFyu_xfi39MpnrigJbDVWTHeGq_PnC1_ojV_xWFPcZbgv6wLXmGkLI06FN5L4hvaFMklB0ER0pM39km_kLX3sTQhCl3R7jjBcAfGmgzqTI5ieC2jyE6ekUWEQqwFOXMBlXdAKnF11rEOzMrl21KKK0VdD61q0Ug7KUwczd8utoCL551Zsl85XDS5Mwk8rN4_BgEiNbQSSuYQemKh1Wh19WkuZUX93d7YvzPT4CkXTnhe0-h9cso_TohQ3PLr4D4sG180wiDJUbYMHqusOPibbUCtb6kSffn5JahZ746F-RqHv3sanJYGTRVd0XJICa_XynXzMp_CLvH-EBlkDmkr2c1jpZ-1k79Pam6fW0NCyFsx1kekoOi4mL1WcBxORebTDPfBJ8Ld9AY1-s0x1_kFpCKX9tI6pJ0PAfbxgLxcxfGz1H6mrqAtRp5CBXpcr0TQpgtDE1DUSvn_bjSyFDV2QCL7rGRxVtpqY8GCN-_ny8ILARnkkj7ZSHsNdaL8EhTWyC-D6zCORYfXfy6_otc1oSSBPeTmpb28tAcf-WaZ3Vx-HLU8dKiYrjV65LLmNa5ZumibPBlg-izwQsqA4Zm6uzbvHhlLCEfX2x0nlGWENh56hErUHUrG19IuNFTiIjDmr5Ug3bfc0qrxE7Vl-GgaZNPNequso8XVlWzVaHVjOsGxYAfORg88SBJCm2Xc1fjvklH1cCIEakMHFF8YeldjsX_145oigemFnos9Fq-qCcp_-8ajkCZM4ifqwuwz_rA4f2mOgu-nFuokPTX_BJyn1mwdNYkE-mVSbP0X-j6PQXMBQIG2BsX6TM1-723vA4w4tkoeWfurMue871dwDEb9-KR7DLmIFnzf5bBYjM-dz6uUfKaKCgalgGE6MzEc4d-jkwEVo83g7OEDnMGIQl5PrnhPqs8fGPcfmcjVzUhwC0Ur1zmWSNkI2IQEHxEzi6p_urXGpjZQVzPV8WqFdfeYGq-HdR-sMgavcDAQjbirM_OP1-3IdBhRvbTK_4SiClHNxQVopPv8VubQ82J7goZrOqflUtjALFCab-FU8-hZOMZ-SGi9QZoeoQuycG00DtK22uDd95PwzQEjhYSFN20IuIkvWYIibGmrhXFMOOGTVEHlSy1J73O2dkpJMqZvzsgn7ccMzR0JddVVQ8XnO3vrHqSF2kbyVEBzZQawPtRfRRVDSySoTAgHzJvMwOswPNlnt0ynhj2TmxI-swLsadY_vbLG3sl-fzyVPN6QW-w')
+    DROPBOX_ACCESS_TOKEN = os.environ.get('DROPBOX_ACCESS_TOKEN')
     DROPBOX_MONITOR_FOLDER = '/apps/otter'  # Monitor Otter app folder with PDFs
     
     # AI Provider API Keys
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
-    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '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') 
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyDKSugqYPsqYMrrAiXh-1bAPf992gVrGbk')
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY') 
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
     
     # Notion configuration
-    NOTION_INTEGRATION_SECRET = os.environ.get('NOTION_INTEGRATION_SECRET', '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')
-    NOTION_DATABASE_ID = os.environ.get('NOTION_DATABASE_ID', '2049f30def818033b42af330a18aa313')
+    NOTION_INTEGRATION_SECRET = os.environ.get('NOTION_INTEGRATION_SECRET')
+    NOTION_DATABASE_ID = os.environ.get('NOTION_DATABASE_ID')
     NOTION_PARENT_PAGE_ID = '2049f30def818033b42af330a18aa313'  # Parent page for client databases
     
     # Processing configuration
