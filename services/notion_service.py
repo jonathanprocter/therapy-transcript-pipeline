@@ -74,7 +74,7 @@ class NotionService:
                 },
                 "Date": {
                     "date": {
-                        "start": session_date
+                        "start": session_date if session_date.count('-') == 2 else self._convert_date_format(session_date)
                     }
                 },
                 "Session Type": {
@@ -543,6 +543,17 @@ class NotionService:
         except Exception as e:
             logger.error(f"Error querying Notion database: {str(e)}")
             return []
+
+    def _convert_date_format(self, date_str: str) -> str:
+        """Convert MM/DD/YYYY format to YYYY-MM-DD ISO format"""
+        try:
+            from datetime import datetime
+            if '/' in date_str:
+                dt = datetime.strptime(date_str, '%m/%d/%Y')
+                return dt.strftime('%Y-%m-%d')
+            return date_str
+        except:
+            return date_str
     
     def create_longitudinal_report(self, database_id: str, longitudinal_analysis: Dict) -> Optional[str]:
         """Create a longitudinal progress report page"""
