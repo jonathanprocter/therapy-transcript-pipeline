@@ -57,43 +57,137 @@ function updateProgressIndicators(stats) {
     }
 }
 
+// Manual scan functionality
+function performManualScan() {
+    const scanButton = document.getElementById('manualScanButton');
+    const statusDiv = document.getElementById('scanStatus');
+
+    if (scanButton) {
+        scanButton.disabled = true;
+        scanButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning...';
+    }
+
+    if (statusDiv) {
+        statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>Scanning for new files...</div>';
+    }
+
+    fetch('/api/manual-scan', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (scanButton) {
+            scanButton.disabled = false;
+            scanButton.innerHTML = '<i class="fas fa-search me-1"></i>Scan Dropbox';
+        }
+
+        if (statusDiv) {
+            if (data.error) {
+                statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
+                updateServiceStatus('dropbox', 'error');
+            } else {
+                const newFileCount = data.new_files ? data.new_files.length : 0;
+                statusDiv.innerHTML = `<div class="alert alert-success"><i class="fas fa-check me-2"></i>${data.message}</div>`;
+                updateServiceStatus('dropbox', 'operational');
+
+                // Update new files count in the dashboard
+                updateNewFilesCount(newFileCount);
+            }
+        }
+
+        // Refresh system stats and logs
+        setTimeout(() => {
+            loadSystemStats();
+            loadProcessingLogs();
+        }, 1000);
+    })
+    .catch(error => {
+        console.error('Error during manual scan:', error);
+
+        if (scanButton) {
+            scanButton.disabled = false;
+            scanButton.innerHTML = '<i class="fas fa-search me-1"></i>Scan Dropbox';
+        }
+
+        if (statusDiv) {
+            statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Scan failed. Please check your connection.</div>';
+        }
+
+        updateServiceStatus('dropbox', 'error');
+    });
+}
+
+function updateNewFilesCount(count) {
+    const countElement = document.getElementById('newFilesCount');
+    if (countElement) {
+        if (count > 0) {
+            countElement.textContent = `${count} new files detected`;
+            countElement.className = 'badge bg-warning';
+        } else {
+            countElement.textContent = 'No new files';
+            countElement.className = 'badge bg-success';
+        }
+    }
+}
+
 // Load service status
 function loadServiceStatus() {
     // Check system health endpoint
     fetch('/health')
         .then(response => response.json())
         .then(data => {
-            if (data.services) {
-                updateServiceStatus('dropbox', data.services.dropbox ? 'operational' : 'error');
-                updateServiceStatus('processing', data.services.ai_service ? 'operational' : 'error');
-                updateServiceStatus('notion', data.services.notion ? 'operational' : 'error');
+            if (data.status === 'healthy') {
+                updateServiceStatus('processing', 'operational');
+
+                // Update individual services based on health check
+                if (data.services) {
+                    updateServiceStatus('dropbox', data.services.dropbox ? 'operational' : 'error');
+                    updateServiceStatus('notion', data.services.notion ? 'operational' : 'warning');
+                }
+            } else {
+                updateServiceStatus('processing', 'warning');
             }
         })
         .catch(error => {
-            console.error('Error checking service status:', error);
-            // Default to checking individual endpoints
-            updateServiceStatus('dropbox', 'operational');
-            updateServiceStatus('processing', 'operational');
-            updateServiceStatus('notion', 'operational');
+            console.error('Error loading service status:', error);
+            updateServiceStatus('processing', 'error');
+            updateServiceStatus('dropbox', 'warning');
+            updateServiceStatus('notion', 'warning');
         });
 }
 
-// Update service status indicators
+// Improved service status update function
 function updateServiceStatus(service, status) {
-    const indicator = document.querySelector(`[data-service="${service}"]`);
-    if (indicator) {
-        indicator.className = 'service-status';
-        indicator.classList.add(status === 'operational' ? 'status-operational' : 'status-error');
+    const serviceElement = document.querySelector(`[data-service="${service}"]`);
+    if (!serviceElement) return;
 
-        const icon = indicator.querySelector('i');
-        const text = indicator.querySelector('.status-text');
+    // Remove existing status classes
+    serviceElement.classList.remove('status-operational', 'status-warning', 'status-error');
 
-        if (status === 'operational') {
-            if (icon) icon.className = 'fas fa-check-circle';
-            if (text) text.textContent = 'Operational';
-        } else {
-            if (icon) icon.className = 'fas fa-exclamation-circle';
-            if (text) text.textContent = 'Error';
+    // Add new status class
+    serviceElement.classList.add(`status-${status}`);
+
+    // Update icon and text
+    const icon = serviceElement.querySelector('i');
+    const statusText = serviceElement.querySelector('.status-text');
+
+    if (icon && statusText) {
+        switch (status) {
+            case 'operational':
+                icon.className = 'fas fa-check-circle me-2';
+                statusText.textContent = 'Operational';
+                break;
+            case 'warning':
+                icon.className = 'fas fa-exclamation-triangle me-2';
+                statusText.textContent = 'Warning';
+                break;
+            case 'error':
+                icon.className = 'fas fa-times-circle me-2';
+                statusText.textContent = 'Error';
+                break;
         }
     }
 }
