@@ -27,7 +27,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="card-title text-white">Total Clients</h5>
-                        <h2 class="text-white mb-0">{{ system_stats.total_clients or 0 }}</h2>
+                        <h2 class="text-white mb-0" data-stat="clients">{{ system_stats.total_clients or 0 }}</h2>
                     </div>
                     <i class="fas fa-users fa-2x text-white opacity-75"></i>
                 </div>
@@ -41,7 +41,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="card-title text-white">Total Sessions</h5>
-                        <h2 class="text-white mb-0">{{ system_stats.total_transcripts or 0 }}</h2>
+                        <h2 class="text-white mb-0" data-stat="transcripts">{{ system_stats.total_transcripts or 0 }}</h2>
                     </div>
                     <i class="fas fa-file-alt fa-2x text-white opacity-75"></i>
                 </div>
@@ -55,7 +55,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="card-title text-dark">Pending</h5>
-                        <h2 class="text-dark mb-0">{{ system_stats.pending_processing or 0 }}</h2>
+                        <h2 class="text-dark mb-0" data-stat="pending">{{ system_stats.pending_processing or 0 }}</h2>
                     </div>
                     <i class="fas fa-clock fa-2x text-dark opacity-75"></i>
                 </div>
@@ -69,9 +69,71 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="card-title text-white">Failed</h5>
-                        <h2 class="text-white mb-0">{{ system_stats.failed_processing or 0 }}</h2>
+                        <h2 class="text-white mb-0" data-stat="failed">{{ system_stats.failed_processing or 0 }}</h2>
                     </div>
                     <i class="fas fa-exclamation-triangle fa-2x text-white opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-heartbeat me-2"></i>System Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="service-status status-operational" data-service="dropbox">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <div>
+                                    <div class="fw-bold">Dropbox Monitor</div>
+                                    <div class="status-text small text-muted">Operational</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="service-status status-operational" data-service="processing">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <div>
+                                    <div class="fw-bold">AI Processing</div>
+                                    <div class="status-text small text-muted">Operational</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="service-status status-operational" data-service="notion">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <div>
+                                    <div class="fw-bold">Notion Sync</div>
+                                    <div class="status-text small text-muted">Operational</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <button id="manualScanBtn" class="btn btn-outline-primary btn-sm" onclick="triggerManualScan()">
+                            <i class="fas fa-sync me-1"></i>Manual Scan
+                        </button>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="small text-muted">
+                            <span id="newFilesCount">127 new files detected</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -277,6 +339,28 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.service-status {
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+.status-operational {
+    background-color: rgba(25, 135, 84, 0.1);
+    border: 1px solid rgba(25, 135, 84, 0.2);
+}
+.status-error {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+.status-operational i {
+    color: #198754;
+}
+.status-error i {
+    color: #dc3545;
+}
+</style>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
 // Create client form handler
 document.getElementById('createClientForm').addEventListener('submit', function(e) {
