@@ -233,7 +233,9 @@ def api_system_stats():
 
     except Exception as e:
         logger.error(f"Error getting system stats: {str(e)}")
-        # Return default stats instead of error
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Return default stats structure instead of error
         return jsonify({
             'system_stats': {
                 'total_clients': 0,
@@ -373,14 +375,14 @@ def get_processing_logs():
                 'transcript_id': log.transcript_id
             })
 
-        return jsonify(log_data)
+        return jsonify(log_data), 200
 
     except Exception as e:
         logger.error(f"Error getting processing logs: {str(e)}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
-        # Return empty array with error logged
-        return jsonify([])
+        # Return empty array instead of object
+        return jsonify([]), 200
 
 @app.route('/api/scan-dropbox', methods=['POST'])
 def scan_dropbox():

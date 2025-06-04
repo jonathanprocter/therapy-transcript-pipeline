@@ -42,12 +42,29 @@ function loadSystemStats() {
             return response.json();
         })
         .then(data => {
-            if (data.system_stats) {
+            console.log('System stats loaded:', data);
+            if (data && data.system_stats) {
                 updateSystemStats(data.system_stats);
+            } else {
+                console.warn('Invalid system stats data format:', data);
+                // Use default stats
+                updateSystemStats({
+                    total_clients: 0,
+                    total_transcripts: 0,
+                    pending_processing: 0,
+                    failed_processing: 0
+                });
             }
         })
         .catch(error => {
             console.error('Failed to load system stats:', error);
+            // Use default stats on error
+            updateSystemStats({
+                total_clients: 0,
+                total_transcripts: 0,
+                pending_processing: 0,
+                failed_processing: 0
+            });
         });
 }
 
@@ -233,12 +250,17 @@ function loadProcessingLogs() {
     })
     .then(data => {
         console.log('Processing logs loaded:', data);
-        if (Array.isArray(data)) {
-            // Update the activity feed
-            const activityFeed = document.querySelector('.activity-feed');
-            if (activityFeed) {
-                let html = '';
-                data.slice(0, 10).forEach(log => {
+        
+        // Ensure data is an array
+        const logs = Array.isArray(data) ? data : [];
+        
+        // Update the activity feed
+        const activityFeed = document.querySelector('.activity-feed');
+        if (activityFeed) {
+            let html = '';
+            
+            if (logs.length > 0) {
+                logs.slice(0, 10).forEach(log => {
                     const icon = log.status === 'success' ? 'fas fa-check-circle text-success' :
                                 log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
                                 'fas fa-info-circle text-info';
@@ -262,15 +284,9 @@ function loadProcessingLogs() {
                         </div>
                     `;
                 });
+            }
 
-                activityFeed.innerHTML = html || '<div class="text-center py-4"><i class="fas fa-history fa-2x text-muted mb-2"></i><p class="text-muted mb-0">No recent activity</p></div>';
-            }
-        } else {
-            console.warn('Invalid data format for processing logs:', data);
-            const activityFeed = document.querySelector('.activity-feed');
-            if (activityFeed) {
-                activityFeed.innerHTML = '<div class="text-center py-4"><i class="fas fa-history fa-2x text-muted mb-2"></i><p class="text-muted mb-0">No recent activity</p></div>';
-            }
+            activityFeed.innerHTML = html || '<div class="text-center py-4"><i class="fas fa-history fa-2x text-muted mb-2"></i><p class="text-muted mb-0">No recent activity</p></div>';
         }
     })
     .catch(error => {
