@@ -366,10 +366,10 @@ def get_processing_logs():
         for log in logs:
             log_data.append({
                 'id': log.id,
-                'activity_type': log.activity_type,
-                'status': log.status,
-                'message': log.message,
-                'created_at': log.created_at.isoformat() if log.created_at else None,
+                'activity_type': log.activity_type or 'unknown',
+                'status': log.status or 'info',
+                'message': log.message or 'No message',
+                'created_at': log.created_at.isoformat() if log.created_at else datetime.now(timezone.utc).isoformat(),
                 'transcript_id': log.transcript_id
             })
 
@@ -377,7 +377,9 @@ def get_processing_logs():
 
     except Exception as e:
         logger.error(f"Error getting processing logs: {str(e)}")
-        # Return empty array instead of error
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Return empty array with error logged
         return jsonify([])
 
 @app.route('/api/scan-dropbox', methods=['POST'])

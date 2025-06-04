@@ -218,11 +218,11 @@ class DropboxService:
 
     def _validate_folder_path(self, folder_path: str) -> str:
         """Validate and find the correct folder path"""
-        logger.info(f"Attempting to validate folder path: {folder_path}")
-
-        # If it's already working, return it
-        if folder_path and hasattr(self, '_validated_folder'):
+        # If we already validated this folder path, return it
+        if hasattr(self, '_validated_folder') and self._validated_folder is not None:
             return self._validated_folder
+            
+        logger.info(f"Attempting to validate folder path: {folder_path}")
 
         # List of possible folder variations to try
         folder_variations = [

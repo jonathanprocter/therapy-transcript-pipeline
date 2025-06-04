@@ -374,7 +374,9 @@
     width: 400px;
 }
 </style>
+{% if not request.endpoint == 'dashboard' or not session.get('dashboard_js_loaded') %}
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endif %}
 <script>
 // Create client form handler
 document.addEventListener('DOMContentLoaded', function() {

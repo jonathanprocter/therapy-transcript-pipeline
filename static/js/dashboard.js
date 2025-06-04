@@ -4,6 +4,7 @@
     
     // Prevent multiple initializations
     if (window.dashboardInitialized) {
+        console.log('Dashboard already initialized, skipping...');
         return;
     }
     window.dashboardInitialized = true;
@@ -11,7 +12,13 @@
     console.log('Dashboard utilities loaded successfully');
 
     // Initialize dashboard when DOM is ready
-    document.addEventListener('DOMContentLoaded', function() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeDashboard);
+    } else {
+        initializeDashboard();
+    }
+
+    function initializeDashboard() {
         console.log('Dashboard initialized successfully');
         loadSystemStats();
         loadServiceStatus();
@@ -22,7 +29,7 @@
             setInterval(loadSystemStats, 30000);
             setInterval(loadServiceStatus, 60000);
         }
-    });
+    }
 })();
 
 // Load and display system statistics
@@ -225,6 +232,7 @@ function loadProcessingLogs() {
         return response.json();
     })
     .then(data => {
+        console.log('Processing logs loaded:', data);
         if (Array.isArray(data)) {
             // Update the activity feed
             const activityFeed = document.querySelector('.activity-feed');
@@ -235,7 +243,8 @@ function loadProcessingLogs() {
                                 log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
                                 'fas fa-info-circle text-info';
 
-                    const date = new Date(log.created_at).toLocaleString();
+                    const date = log.created_at ? new Date(log.created_at).toLocaleString() : 'Unknown time';
+                    const message = log.message || 'No message available';
 
                     html += `
                         <div class="activity-item mb-3 pb-3 border-bottom">
@@ -244,7 +253,7 @@ function loadProcessingLogs() {
                                     <i class="${icon}"></i>
                                 </div>
                                 <div class="activity-content flex-grow-1">
-                                    <div class="activity-message">${log.message}</div>
+                                    <div class="activity-message">${message}</div>
                                     <div class="activity-meta text-muted small">
                                         <i class="fas fa-clock me-1"></i>${date}
                                     </div>
@@ -255,6 +264,12 @@ function loadProcessingLogs() {
                 });
 
                 activityFeed.innerHTML = html || '<div class="text-center py-4"><i class="fas fa-history fa-2x text-muted mb-2"></i><p class="text-muted mb-0">No recent activity</p></div>';
+            }
+        } else {
+            console.warn('Invalid data format for processing logs:', data);
+            const activityFeed = document.querySelector('.activity-feed');
+            if (activityFeed) {
+                activityFeed.innerHTML = '<div class="text-center py-4"><i class="fas fa-history fa-2x text-muted mb-2"></i><p class="text-muted mb-0">No recent activity</p></div>';
             }
         }
     })
