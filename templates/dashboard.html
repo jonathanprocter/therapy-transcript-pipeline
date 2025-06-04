@@ -353,11 +353,25 @@
     background-color: rgba(220, 53, 69, 0.1);
     border: 1px solid rgba(220, 53, 69, 0.2);
 }
+.status-checking {
+    background-color: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
 .status-operational i {
     color: #198754;
 }
 .status-error i {
     color: #dc3545;
+}
+.status-checking i {
+    color: #ffc107;
+}
+.alert-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    width: 400px;
 }
 </style>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
