@@ -1,5 +1,5 @@
 """
-Quick AI completion for missing Anthropic and Gemini analysis
+Quick AI completion - process just 5 transcripts to make steady progress
 """
 import os
 import sys
@@ -16,8 +16,8 @@ from config import Config
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def complete_missing_analysis():
-    """Complete missing Anthropic and Gemini analysis for first 20 transcripts"""
+def complete_five_transcripts():
+    """Complete AI analysis for just 5 transcripts"""
     import anthropic
     import google.generativeai as genai
     
@@ -26,12 +26,10 @@ def complete_missing_analysis():
     genai.configure(api_key=Config.GEMINI_API_KEY)
     gemini_model = genai.GenerativeModel('gemini-pro')
     
-    processed = 0
-    
     with app.app_context():
         from sqlalchemy import text
         
-        # Get first 20 transcripts missing analysis
+        # Get 5 transcripts missing analysis
         query = text("""
             SELECT t.id, t.original_filename, c.name as client_name
             FROM transcript t
@@ -44,7 +42,7 @@ def complete_missing_analysis():
                 (t.gemini_analysis IS NULL OR CHAR_LENGTH(CAST(t.gemini_analysis AS TEXT)) < 1000)
             )
             ORDER BY t.id
-            LIMIT 20
+            LIMIT 5
         """)
         
         result = db.session.execute(query)
@@ -60,11 +58,10 @@ def complete_missing_analysis():
             if not transcript:
                 continue
             
-            success_count = 0
-            
             # Anthropic Analysis
             if not transcript.anthropic_analysis or len(str(transcript.anthropic_analysis)) < 1000:
                 try:
+                    logger.info("  Starting Anthropic...")
                     response = anthropic_client.messages.create(
                         model=Config.ANTHROPIC_MODEL,
                         max_tokens=4000,
@@ -77,73 +74,66 @@ def complete_missing_analysis():
                     analysis = response.content[0].text.strip()
                     if len(analysis) > 500:
                         transcript.anthropic_analysis = analysis
-                        success_count += 1
                         logger.info(f"  ✓ Anthropic complete ({len(analysis)} chars)")
+                    else:
+                        logger.warning(f"  Anthropic analysis too short")
                         
                 except Exception as e:
                     logger.error(f"  Anthropic failed: {str(e)[:50]}")
                 
-                time.sleep(3)
+                time.sleep(5)  # Rate limiting
             else:
-                success_count += 1
+                logger.info("  ✓ Anthropic already complete")
             
             # Gemini Analysis
             if not transcript.gemini_analysis or len(str(transcript.gemini_analysis)) < 1000:
                 try:
+                    logger.info("  Starting Gemini...")
                     response = gemini_model.generate_content(
                         f"{Config.THERAPY_ANALYSIS_PROMPT}\n\n{transcript.raw_content}",
-                        generation_config=genai.types.GenerationConfig(
-                            max_output_tokens=4000,
-                            temperature=0.3
-                        )
+                        generation_config={
+                            'max_output_tokens': 4000,
+                            'temperature': 0.3
+                        }
                     )
                     
                     analysis = response.text.strip()
                     if len(analysis) > 500:
                         transcript.gemini_analysis = analysis
-                        success_count += 1
                         logger.info(f"  ✓ Gemini complete ({len(analysis)} chars)")
+                    else:
+                        logger.warning(f"  Gemini analysis too short")
                         
                 except Exception as e:
                     logger.error(f"  Gemini failed: {str(e)[:50]}")
                 
-                time.sleep(3)
+                time.sleep(5)  # Rate limiting
             else:
-                success_count += 1
+                logger.info("  ✓ Gemini already complete")
             
-            # Check OpenAI
-            if transcript.openai_analysis and len(str(transcript.openai_analysis)) > 1000:
-                success_count += 1
+            # Check if all complete
+            openai_complete = transcript.openai_analysis and len(str(transcript.openai_analysis)) > 1000
+            anthropic_complete = transcript.anthropic_analysis and len(str(transcript.anthropic_analysis)) > 1000
+            gemini_complete = transcript.gemini_analysis and len(str(transcript.gemini_analysis)) > 1000
             
-            # Update status if all complete
-            if success_count >= 3:
+            if openai_complete and anthropic_complete and gemini_complete:
                 transcript.processing_status = 'completed'
-                
-                log_entry = ProcessingLog(
-                    transcript_id=transcript.id,
-                    status='success',
-                    message=f"Completed comprehensive AI analysis with all 3 providers",
-                    created_at=datetime.now(timezone.utc)
-                )
-                db.session.add(log_entry)
-                processed += 1
+                logger.info("  ✓ All 3 providers complete")
             
             db.session.commit()
-            time.sleep(1)
-        
-        logger.info(f"Completed processing {processed} transcripts")
-
-def check_status():
-    """Check current completion status"""
+            logger.info("")
+    
+    # Status check
     with app.app_context():
         from sqlalchemy import text
         
         query = text("""
             SELECT 
                 COUNT(*) as total,
-                COUNT(CASE WHEN openai_analysis IS NOT NULL AND CHAR_LENGTH(CAST(openai_analysis AS TEXT)) > 1000 THEN 1 END) as openai_done,
                 COUNT(CASE WHEN anthropic_analysis IS NOT NULL AND CHAR_LENGTH(CAST(anthropic_analysis AS TEXT)) > 1000 THEN 1 END) as anthropic_done,
-                COUNT(CASE WHEN gemini_analysis IS NOT NULL AND CHAR_LENGTH(CAST(gemini_analysis AS TEXT)) > 1000 THEN 1 END) as gemini_done
+                COUNT(CASE WHEN gemini_analysis IS NOT NULL AND CHAR_LENGTH(CAST(gemini_analysis AS TEXT)) > 1000 THEN 1 END) as gemini_done,
+                COUNT(CASE WHEN openai_analysis IS NOT NULL AND CHAR_LENGTH(CAST(openai_analysis AS TEXT)) > 1000 THEN 1 END) as openai_done,
+                COUNT(CASE WHEN processing_status = 'completed' THEN 1 END) as complete
             FROM transcript 
             WHERE raw_content IS NOT NULL AND CHAR_LENGTH(raw_content) > 100
         """)
@@ -151,18 +141,14 @@ def check_status():
         result = db.session.execute(query)
         row = result.fetchone()
         
-        total, openai_done, anthropic_done, gemini_done = row
+        total, anthropic_done, gemini_done, openai_done, complete = row
         
         logger.info("CURRENT STATUS:")
         logger.info(f"Total: {total}")
-        logger.info(f"OpenAI: {openai_done}/{total} ({openai_done/total*100:.1f}%)")
-        logger.info(f"Anthropic: {anthropic_done}/{total} ({anthropic_done/total*100:.1f}%)")
-        logger.info(f"Gemini: {gemini_done}/{total} ({gemini_done/total*100:.1f}%)")
-
-def main():
-    """Main execution"""
-    complete_missing_analysis()
-    check_status()
+        logger.info(f"OpenAI: {openai_done}/{total}")
+        logger.info(f"Anthropic: {anthropic_done}/{total}")
+        logger.info(f"Gemini: {gemini_done}/{total}")
+        logger.info(f"Complete: {complete}/{total}")
 
 if __name__ == "__main__":
-    main()
+    complete_five_transcripts()
