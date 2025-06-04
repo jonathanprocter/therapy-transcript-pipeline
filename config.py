@@ -37,33 +37,34 @@ class Config:
 
     1. Title: "Comprehensive Clinical Progress Note for [Client's Full Name]'s Therapy Session on [Date]"
 
-    2. Subjective Section: Document the client's self-reported experiences, emotional states, and presenting concerns. Include direct quotes and the client's narrative about their current psychological state, recent events, and internal experiences.
+    2. Subjective Section: Document the client's self-reported experiences, emotional states, and presenting concerns with extensive detail. Include direct quotes that reveal psychological material, the client's narrative about their current psychological state, recent events, and internal experiences. Provide rich context and analysis of the client's subjective experience. Example format: "[Client] attended today's session expressing significant distress about [specific issue]. [He/She] appeared visibly [emotional state] when describing [situation], stating, '[direct quote].' This statement reflects [client's] sense of [psychological theme] regarding [situation], themes that have emerged in previous sessions related to [broader patterns]. [Client] reported [additional details with quotes and analysis]."
 
-    3. Objective Section: Provide clinical observations including presentation, affect, mood, thought process, speech patterns, behavior, and any notable changes from previous sessions.
+    3. Objective Section: Provide detailed clinical observations including presentation, affect, mood, thought process, speech patterns, behavior, and any notable changes. Include micro-observations of nonverbal behavior, emotional shifts, and clinical phenomena observed during the session. Example format: "[Client] presented to the session [appearance details]. [He/She] was alert and oriented, with [speech characteristics] and [thought process]. [His/Her] affect was notably [description] throughout most of the session, with [emotional range details]. This [observation] appeared to be [clinical interpretation], as [evidence of interpretation]. [Additional detailed observations with clinical significance]."
 
-    4. Assessment Section: Offer clinical diagnostic impressions, symptom assessment, progress evaluation, and clinical formulation based on observable data and client reports.
+    4. Assessment Section: Offer comprehensive clinical diagnostic impressions, symptom assessment, progress evaluation, and clinical formulation based on observable data and client reports. Demonstrate sophisticated clinical thinking with integration of multiple theoretical frameworks. Example format: "[Client] continues to meet criteria for [specific diagnosis] as evidenced by [specific symptoms and behaviors]. [His/Her] recent [stressor/event] has [impact on symptoms], particularly [specific symptom areas]. The [specific presentation] appears to be [clinical interpretation] rather than [differential consideration], as [clinical evidence]. [Additional sophisticated clinical formulation with theoretical integration]."
 
-    5. Plan Section: Detail therapeutic interventions used, homework assignments, treatment goals, and specific plans for future sessions.
+    5. Plan Section: Detail specific therapeutic interventions used, homework assignments, treatment goals, and specific plans for future sessions. Include multiple therapeutic modalities and specific techniques. Example format: "[Therapeutic approach] Interventions: Continue to utilize [framework] to address [specific targets]. In today's session, we [specific intervention], helping [client] recognize [therapeutic insight]. We will continue to develop [specific skills] through [specific techniques]. [Additional specific intervention planning across multiple modalities]."
 
     6. Supplemental Analyses:
-       - Tonal Analysis: Document significant shifts in emotional tone, voice quality, and affect throughout the session
-       - Thematic Analysis: Identify recurring themes, patterns, and underlying psychological dynamics
-       - Sentiment Analysis: Assess overall emotional trajectory and engagement levels
+       - Tonal Analysis: Document significant shifts in emotional tone, voice quality, and affect throughout the session with specific examples. Format: "Shift 1: From [initial tone] to [shifted tone]: A significant tonal shift occurred when [specific trigger]. [His/Her] tone shifted from [detailed description] to [detailed description], with [specific vocal changes]. This shift was triggered specifically when [detailed context and significance]."
+       - Thematic Analysis: Identify recurring themes, patterns, and underlying psychological dynamics with detailed exploration
+       - Sentiment Analysis: Assess overall emotional trajectory and engagement levels with specific observations
 
-    7. Key Points: Highlight critical therapeutic moments, breakthroughs, resistance patterns, and clinically significant observations
+    7. Key Points: Highlight critical therapeutic moments, breakthroughs, resistance patterns, and clinically significant observations with detailed analysis. Format: "• [Theme/Pattern] as [Clinical Significance]: [Detailed explanation of the pattern, its clinical importance, and therapeutic implications]. [Additional analysis of how this impacts treatment and what interventions are indicated]."
 
-    8. Significant Quotes: Include verbatim client statements that reveal important psychological material, insights, or emotional states
+    8. Significant Quotes: Include verbatim client statements with detailed analysis of their psychological significance. Format: "'[Exact quote]' [Client] made this statement when [context]. [He/She] described [additional context]. This quote is significant because [detailed psychological analysis and clinical implications]."
 
-    9. Comprehensive Narrative Summary: Provide an integrated clinical narrative that synthesizes all observations into a cohesive understanding of the client's current psychological state and treatment progress
+    9. Comprehensive Narrative Summary: Provide an integrated clinical narrative that synthesizes all observations into a cohesive understanding of the client's current psychological state and treatment progress. This should be a sophisticated integration demonstrating advanced clinical thinking and therapeutic wisdom.
 
     Your analysis must demonstrate:
     - Depth of clinical thinking with sophisticated psychological understanding
-    - Integration of multiple therapeutic frameworks and perspectives
+    - Integration of multiple therapeutic frameworks and perspectives  
     - Professional clinical voice with appropriate terminology
     - Detailed behavioral observations and clinical assessments
     - Actionable treatment planning and therapeutic recommendations
+    - Rich detail and clinical sophistication throughout all sections
 
-    Provide the most comprehensive and detailed analysis possible, utilizing the full scope of clinical expertise.
+    Provide the most comprehensive and detailed analysis possible, utilizing the full scope of clinical expertise and demonstrating the depth shown in the examples.
 
     Transcript:
     """
