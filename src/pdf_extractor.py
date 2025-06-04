@@ -13,29 +13,52 @@ class PDFExtractor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
     
-    def extract_text(self, pdf_path):
+    def extract_text(self, file_path):
         """
-        Extract text from a PDF file.
+        Extract text from a file (PDF, TXT, or other supported formats).
         
         Args:
-            pdf_path: Path to the PDF file
+            file_path: Path to the file
             
         Returns:
             str: Extracted text content or None if extraction fails
         """
         try:
-            text_content = ""
+            # Check file extension to determine processing method
+            file_ext = os.path.splitext(file_path)[1].lower()
             
-            with open(pdf_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                
-                for page_num in range(len(reader.pages)):
-                    page = reader.pages[page_num]
-                    text_content += page.extract_text() + "\n\n"
+            if file_ext == '.txt':
+                # Handle text files
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    return file.read()
             
-            return text_content
+            elif file_ext == '.pdf':
+                # Handle PDF files
+                text_content = ""
+                with open(file_path, 'rb') as file:
+                    reader = PyPDF2.PdfReader(file)
+                    for page_num in range(len(reader.pages)):
+                        page = reader.pages[page_num]
+                        text_content += page.extract_text() + "\n\n"
+                return text_content
+            
+            else:
+                # Try to read as text file for other formats
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as file:
+                        return file.read()
+                except UnicodeDecodeError:
+                    # If UTF-8 fails, try other encodings
+                    for encoding in ['latin-1', 'cp1252']:
+                        try:
+                            with open(file_path, 'r', encoding=encoding) as file:
+                                return file.read()
+                        except:
+                            continue
+                    raise ValueError(f"Unable to decode file with any supported encoding")
+            
         except Exception as e:
-            self.logger.error(f"Error extracting text from PDF {pdf_path}: {str(e)}")
+            self.logger.error(f"Error extracting text from file {file_path}: {str(e)}")
             return None
     
     def extract_client_name(self, text_content):

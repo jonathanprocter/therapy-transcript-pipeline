@@ -8,9 +8,9 @@ class Config:
     DROPBOX_MONITOR_FOLDER = '/apps/otter'
     
     # AI Provider API Keys
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
     ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY') 
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyDKSugqYPsqYMrrAiXh-1bAPf992gVrGbk')
     
     # Notion configuration
     NOTION_INTEGRATION_SECRET = os.environ.get('NOTION_INTEGRATION_SECRET')
