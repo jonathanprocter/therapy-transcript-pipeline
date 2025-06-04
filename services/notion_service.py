@@ -51,51 +51,94 @@ class NotionService:
             logger.error("Notion not configured")
             return {"success": False, "error": "Notion not configured"}
         
-        database_id = Config.NOTION_DATABASE_ID
+        # Try to get client-specific database ID first, then fall back to config
+        from models import Client
+        client = Client.query.filter_by(name=client_name).first()
+        database_id = client.notion_database_id if client and client.notion_database_id else Config.NOTION_DATABASE_ID
+        
         if not database_id:
             logger.error("Notion database ID not configured")
             return {"success": False, "error": "Database ID not configured"}
         
         try:
-            # Create page properties matching the actual database structure
+            # Create page properties for the therapy session database
             properties = {
-                "Client Name": {
+                "Session Title": {
                     "title": [
                         {
                             "text": {
-                                "content": client_name
+                                "content": f"Session {session_date} - {client_name}"
                             }
                         }
                     ]
                 },
-                "Appointment Date": {
+                "Date": {
                     "date": {
                         "start": session_date
+                    }
+                },
+                "Session Type": {
+                    "select": {
+                        "name": "Individual"
+                    }
+                },
+                "Status": {
+                    "select": {
+                        "name": "Completed"
                     }
                 }
             }
             
-            # Add emotional analysis and themes if available
+            # Add emotional analysis data if available
             if emotional_data:
                 primary_emotion = emotional_data.get('primary_emotion', 'neutral')
-                secondary_emotion = emotional_data.get('secondary_emotion', '')
+                intensity = emotional_data.get('intensity', 0.5)
                 
-                # Use Key Themes for emotional data
+                properties["Primary Emotion"] = {
+                    "select": {
+                        "name": primary_emotion.title()
+                    }
+                }
+                
+                properties["Intensity"] = {
+                    "number": intensity
+                }
+                
+                # Add themes
                 themes = [primary_emotion.title()]
-                if secondary_emotion:
-                    themes.append(secondary_emotion.title())
+                if emotional_data.get('secondary_emotion'):
+                    themes.append(emotional_data.get('secondary_emotion').title())
                 
                 properties["Key Themes"] = {
                     "multi_select": [{"name": theme} for theme in themes]
                 }
+            
+            # Add content to Progress Notes and Action Items
+            if content:
+                # Split content for Progress Notes (first part)
+                progress_content = content[:1900] if len(content) > 1900 else content
+                properties["Progress Notes"] = {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": progress_content
+                            }
+                        }
+                    ]
+                }
                 
-                # Use Hashtags for emotional intensity and other metadata
-                hashtags = [f"intensity_{int(emotional_data.get('intensity', 0.5) * 100)}%"]
-                if emotional_data.get('color_palette', {}).get('primary'):
-                    hashtags.append("adaptive_color_therapy")
-                
-                properties["Hashtags"] = {
-                    "multi_select": [{"name": tag} for tag in hashtags]
+                # Add action items summary
+                action_summary = f"Follow-up on therapeutic progress. Continue emotional work with {emotional_data.get('primary_emotion', 'neutral')} emotion focus."
+                properties["Action Items"] = {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": action_summary
+                            }
+                        }
+                    ]
                 }
             
             # Create content blocks with proper text length limits
@@ -170,9 +213,113 @@ class NotionService:
             return {"success": False, "error": error_msg}
 
     def create_client_database(self, client_name: str) -> Optional[str]:
-        """Create a new database for a client"""
+        """Create a new database for a client in the parent page"""
         if not self.headers:
             logger.error("Notion not configured")
+            return None
+        
+        from config import Config
+        parent_page_id = Config.NOTION_PARENT_PAGE_ID
+        if not parent_page_id:
+            logger.error("Parent page ID not configured")
+            return None
+        
+        try:
+            # Create database structure for therapy sessions
+            database_data = {
+                "parent": {"page_id": parent_page_id},
+                "title": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": f"{client_name} - Therapy Sessions"
+                        }
+                    }
+                ],
+                "properties": {
+                    "Session Title": {
+                        "title": {}
+                    },
+                    "Date": {
+                        "date": {}
+                    },
+                    "Session Type": {
+                        "select": {
+                            "options": [
+                                {"name": "Individual", "color": "blue"},
+                                {"name": "Group", "color": "green"},
+                                {"name": "Family", "color": "purple"},
+                                {"name": "Assessment", "color": "orange"}
+                            ]
+                        }
+                    },
+                    "Primary Emotion": {
+                        "select": {
+                            "options": [
+                                {"name": "Hopeful", "color": "green"},
+                                {"name": "Anxious", "color": "yellow"},
+                                {"name": "Sad", "color": "blue"},
+                                {"name": "Angry", "color": "red"},
+                                {"name": "Content", "color": "default"},
+                                {"name": "Frustrated", "color": "orange"},
+                                {"name": "Confused", "color": "gray"}
+                            ]
+                        }
+                    },
+                    "Intensity": {
+                        "number": {
+                            "format": "percent"
+                        }
+                    },
+                    "Key Themes": {
+                        "multi_select": {
+                            "options": [
+                                {"name": "Trauma", "color": "red"},
+                                {"name": "Relationships", "color": "pink"},
+                                {"name": "Anxiety", "color": "yellow"},
+                                {"name": "Depression", "color": "blue"},
+                                {"name": "Self-Esteem", "color": "purple"},
+                                {"name": "Coping Skills", "color": "green"},
+                                {"name": "Family", "color": "orange"}
+                            ]
+                        }
+                    },
+                    "Progress Notes": {
+                        "rich_text": {}
+                    },
+                    "Action Items": {
+                        "rich_text": {}
+                    },
+                    "Status": {
+                        "select": {
+                            "options": [
+                                {"name": "Completed", "color": "green"},
+                                {"name": "In Progress", "color": "yellow"},
+                                {"name": "Cancelled", "color": "red"},
+                                {"name": "Rescheduled", "color": "orange"}
+                            ]
+                        }
+                    }
+                }
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/databases",
+                headers=self.headers,
+                json=database_data
+            )
+            
+            if response.status_code == 200:
+                database_id = response.json().get('id')
+                logger.info(f"Created client database for {client_name}: {database_id}")
+                return database_id
+            else:
+                error_msg = f"Failed to create database: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating client database: {str(e)}")
             return None
         
         try:

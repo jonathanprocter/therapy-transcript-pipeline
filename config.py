@@ -15,6 +15,7 @@ class Config:
     # Notion configuration
     NOTION_INTEGRATION_SECRET = os.environ.get('NOTION_INTEGRATION_SECRET', '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')
     NOTION_DATABASE_ID = os.environ.get('NOTION_DATABASE_ID', '2049f30def818033b42af330a18aa313')
+    NOTION_PARENT_PAGE_ID = '2049f30def818033b42af330a18aa313'  # Parent page for client databases
     
     # Processing configuration
     SUPPORTED_FILE_TYPES = ['.pdf', '.txt', '.docx']
