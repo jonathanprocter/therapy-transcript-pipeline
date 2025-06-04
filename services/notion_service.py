@@ -57,9 +57,9 @@ class NotionService:
             return {"success": False, "error": "Database ID not configured"}
         
         try:
-            # Create page properties
+            # Create page properties matching the actual database structure
             properties = {
-                "Client": {
+                "Client Name": {
                     "title": [
                         {
                             "text": {
@@ -68,31 +68,34 @@ class NotionService:
                         }
                     ]
                 },
-                "Session Date": {
+                "Appointment Date": {
                     "date": {
                         "start": session_date
-                    }
-                },
-                "Status": {
-                    "select": {
-                        "name": "Completed"
                     }
                 }
             }
             
-            # Add emotional analysis properties if available
+            # Add emotional analysis and themes if available
             if emotional_data:
                 primary_emotion = emotional_data.get('primary_emotion', 'neutral')
-                intensity = emotional_data.get('intensity', 0.5)
+                secondary_emotion = emotional_data.get('secondary_emotion', '')
                 
-                properties["Primary Emotion"] = {
-                    "select": {
-                        "name": primary_emotion.title()
-                    }
+                # Use Key Themes for emotional data
+                themes = [primary_emotion.title()]
+                if secondary_emotion:
+                    themes.append(secondary_emotion.title())
+                
+                properties["Key Themes"] = {
+                    "multi_select": [{"name": theme} for theme in themes]
                 }
                 
-                properties["Intensity"] = {
-                    "number": round(intensity, 2)
+                # Use Hashtags for emotional intensity and other metadata
+                hashtags = [f"intensity_{int(emotional_data.get('intensity', 0.5) * 100)}%"]
+                if emotional_data.get('color_palette', {}).get('primary'):
+                    hashtags.append("adaptive_color_therapy")
+                
+                properties["Hashtags"] = {
+                    "multi_select": [{"name": tag} for tag in hashtags]
                 }
             
             # Create content blocks with proper text length limits
