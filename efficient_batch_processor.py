@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app import db
+from app import app, db
 from models import Transcript, Client
 from services.ai_service import AIService
 
@@ -27,15 +27,15 @@ class EfficientBatchProcessor:
         
     def get_incomplete_transcripts(self, batch_size=5):
         """Get transcripts missing AI analysis"""
-        with db.session() as session:
+        with app.app_context():
             # Get transcripts missing Anthropic analysis
-            anthropic_incomplete = session.query(Transcript).filter(
+            anthropic_incomplete = db.session.query(Transcript).filter(
                 Transcript.processing_status == 'completed',
                 Transcript.anthropic_analysis.is_(None)
             ).limit(batch_size).all()
             
             # Get transcripts missing Gemini analysis  
-            gemini_incomplete = session.query(Transcript).filter(
+            gemini_incomplete = db.session.query(Transcript).filter(
                 Transcript.processing_status == 'completed',
                 Transcript.gemini_analysis.is_(None)
             ).limit(batch_size).all()
@@ -44,72 +44,74 @@ class EfficientBatchProcessor:
     
     def process_anthropic_batch(self, transcripts):
         """Process a batch for Anthropic analysis"""
-        for transcript in transcripts:
-            try:
-                if not transcript.anthropic_analysis:
-                    logger.info(f"Processing Anthropic: {transcript.filename}")
-                    
-                    # Generate analysis
-                    analysis = self.ai_service.generate_anthropic_analysis(transcript.raw_text)
-                    
-                    if analysis:
-                        transcript.anthropic_analysis = analysis
-                        db.session.commit()
-                        logger.info(f"Completed Anthropic analysis for {transcript.filename}")
+        with app.app_context():
+            for transcript in transcripts:
+                try:
+                    if not transcript.anthropic_analysis:
+                        logger.info(f"Processing Anthropic: {transcript.filename}")
                         
-                        # Rate limiting
-                        time.sleep(2)
-                    else:
-                        logger.warning(f"No analysis generated for {transcript.filename}")
+                        # Generate analysis
+                        analysis = self.ai_service._analyze_with_anthropic(transcript.raw_text)
                         
-            except Exception as e:
-                logger.error(f"Error processing {transcript.filename} with Anthropic: {e}")
-                db.session.rollback()
-                continue
+                        if analysis:
+                            transcript.anthropic_analysis = analysis
+                            db.session.commit()
+                            logger.info(f"Completed Anthropic analysis for {transcript.filename}")
+                            
+                            # Rate limiting
+                            time.sleep(2)
+                        else:
+                            logger.warning(f"No analysis generated for {transcript.filename}")
+                            
+                except Exception as e:
+                    logger.error(f"Error processing {transcript.filename} with Anthropic: {e}")
+                    db.session.rollback()
+                    continue
     
     def process_gemini_batch(self, transcripts):
         """Process a batch for Gemini analysis"""
-        for transcript in transcripts:
-            try:
-                if not transcript.gemini_analysis:
-                    logger.info(f"Processing Gemini: {transcript.filename}")
-                    
-                    # Generate analysis
-                    analysis = self.ai_service.generate_gemini_analysis(transcript.raw_text)
-                    
-                    if analysis:
-                        transcript.gemini_analysis = analysis
-                        db.session.commit()
-                        logger.info(f"Completed Gemini analysis for {transcript.filename}")
+        with app.app_context():
+            for transcript in transcripts:
+                try:
+                    if not transcript.gemini_analysis:
+                        logger.info(f"Processing Gemini: {transcript.filename}")
                         
-                        # Rate limiting
-                        time.sleep(1)
-                    else:
-                        logger.warning(f"No analysis generated for {transcript.filename}")
+                        # Generate analysis
+                        analysis = self.ai_service._analyze_with_gemini(transcript.raw_text)
                         
-            except Exception as e:
-                logger.error(f"Error processing {transcript.filename} with Gemini: {e}")
-                db.session.rollback()
-                continue
+                        if analysis:
+                            transcript.gemini_analysis = analysis
+                            db.session.commit()
+                            logger.info(f"Completed Gemini analysis for {transcript.filename}")
+                            
+                            # Rate limiting
+                            time.sleep(1)
+                        else:
+                            logger.warning(f"No analysis generated for {transcript.filename}")
+                            
+                except Exception as e:
+                    logger.error(f"Error processing {transcript.filename} with Gemini: {e}")
+                    db.session.rollback()
+                    continue
     
     def get_completion_status(self):
         """Get current completion status"""
-        with db.session() as session:
-            total = session.query(Transcript).filter(
+        with app.app_context():
+            total = db.session.query(Transcript).filter(
                 Transcript.processing_status == 'completed'
             ).count()
             
-            openai_complete = session.query(Transcript).filter(
+            openai_complete = db.session.query(Transcript).filter(
                 Transcript.processing_status == 'completed',
                 Transcript.openai_analysis.isnot(None)
             ).count()
             
-            anthropic_complete = session.query(Transcript).filter(
+            anthropic_complete = db.session.query(Transcript).filter(
                 Transcript.processing_status == 'completed',
                 Transcript.anthropic_analysis.isnot(None)
             ).count()
             
-            gemini_complete = session.query(Transcript).filter(
+            gemini_complete = db.session.query(Transcript).filter(
                 Transcript.processing_status == 'completed',
                 Transcript.gemini_analysis.isnot(None)
             ).count()
