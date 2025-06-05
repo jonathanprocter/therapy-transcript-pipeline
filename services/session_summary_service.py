@@ -15,7 +15,7 @@ class SessionSummaryService:
         self.ai_service = AIService()
     
     def generate_session_summary(self, transcript_data: Dict) -> Dict:
-        """Generate a comprehensive one-click session summary"""
+        """Generate a comprehensive one-click session summary using AI-powered analysis"""
         try:
             logger.info(f"Generating session summary for transcript: {transcript_data.get('original_filename', 'Unknown')}")
             
@@ -24,24 +24,21 @@ class SessionSummaryService:
             anthropic_analysis = self._extract_analysis_text(transcript_data.get('anthropic_analysis'))
             gemini_analysis = self._extract_analysis_text(transcript_data.get('gemini_analysis'))
             
-            # Get raw transcript content for additional processing if needed
+            # Get raw transcript content for enhanced AI processing
             raw_content = transcript_data.get('raw_content', '')
+            client_name = transcript_data.get('client_name', 'Client')
             
-            # Generate comprehensive summary
-            summary_data = {
-                'session_overview': self._generate_session_overview(openai_analysis, anthropic_analysis, gemini_analysis),
-                'key_insights': self._extract_key_insights(openai_analysis, anthropic_analysis, gemini_analysis),
-                'therapeutic_progress': self._assess_therapeutic_progress(openai_analysis, anthropic_analysis, gemini_analysis),
-                'client_presentation': self._analyze_client_presentation(openai_analysis, anthropic_analysis, gemini_analysis),
-                'session_goals': self._identify_session_goals(openai_analysis, anthropic_analysis, gemini_analysis),
-                'interventions_used': self._extract_interventions(openai_analysis, anthropic_analysis, gemini_analysis),
-                'homework_assignments': self._extract_homework(openai_analysis, anthropic_analysis, gemini_analysis),
-                'risk_assessment': self._assess_risk_factors(openai_analysis, anthropic_analysis, gemini_analysis),
-                'next_session_focus': self._plan_next_session(openai_analysis, anthropic_analysis, gemini_analysis),
-                'clinical_impressions': self._extract_clinical_impressions(openai_analysis, anthropic_analysis, gemini_analysis),
-                'session_rating': self._calculate_session_rating(openai_analysis, anthropic_analysis, gemini_analysis),
-                'follow_up_actions': self._identify_follow_up_actions(openai_analysis, anthropic_analysis, gemini_analysis)
-            }
+            # If we have limited analysis data, use AI to generate enhanced summary
+            if not openai_analysis and not anthropic_analysis and not gemini_analysis and raw_content:
+                logger.info("Limited analysis data found, generating AI-enhanced summary from raw content")
+                summary_data = self._generate_ai_enhanced_summary(raw_content, client_name)
+            else:
+                # Generate comprehensive summary from existing analyses
+                summary_data = self._generate_from_existing_analyses(openai_analysis, anthropic_analysis, gemini_analysis, raw_content, client_name)
+            
+            # Enhance summary with AI-powered insights if service is available
+            if self.ai_service and raw_content:
+                summary_data = self._enhance_with_ai_insights(summary_data, raw_content, client_name)
             
             # Add metadata
             summary_data['metadata'] = {
@@ -59,6 +56,157 @@ class SessionSummaryService:
         except Exception as e:
             logger.error(f"Error generating session summary: {str(e)}")
             return self._generate_error_summary(str(e))
+    
+    def _generate_ai_enhanced_summary(self, raw_content: str, client_name: str) -> Dict:
+        """Generate enhanced summary using AI when limited analysis data is available"""
+        try:
+            # Use AI service to generate comprehensive analysis
+            prompt = f"""
+            As an expert clinical therapist, analyze this therapy session transcript and provide a comprehensive session summary.
+            
+            Client: {client_name}
+            
+            Transcript:
+            {raw_content[:4000]}  # Limit for token efficiency
+            
+            Provide a detailed analysis including:
+            1. Session overview and key themes
+            2. Therapeutic insights and client presentation
+            3. Progress indicators and goal achievement
+            4. Interventions used and their effectiveness
+            5. Risk assessment (suicide, self-harm, substance use)
+            6. Clinical impressions and diagnostic considerations
+            7. Session effectiveness rating (1-10) with rationale
+            8. Recommendations for next session
+            
+            Format as JSON with detailed, clinically relevant insights.
+            """
+            
+            if self.ai_service.is_openai_available():
+                response = self.ai_service._call_openai_llm(prompt, "json_object")
+                if response:
+                    import json
+                    ai_analysis = json.loads(response)
+                    return self._format_ai_analysis(ai_analysis)
+            
+            # Fallback to structured analysis
+            return self._generate_structured_fallback(raw_content, client_name)
+            
+        except Exception as e:
+            logger.error(f"Error in AI-enhanced summary generation: {str(e)}")
+            return self._generate_structured_fallback(raw_content, client_name)
+    
+    def _generate_from_existing_analyses(self, openai: str, anthropic: str, gemini: str, raw_content: str, client_name: str) -> Dict:
+        """Generate summary from existing AI analyses with enhanced processing"""
+        return {
+            'session_overview': self._generate_session_overview(openai, anthropic, gemini),
+            'key_insights': self._extract_key_insights(openai, anthropic, gemini),
+            'therapeutic_progress': self._assess_therapeutic_progress(openai, anthropic, gemini),
+            'client_presentation': self._analyze_client_presentation(openai, anthropic, gemini),
+            'session_goals': self._identify_session_goals(openai, anthropic, gemini),
+            'interventions_used': self._extract_interventions(openai, anthropic, gemini),
+            'homework_assignments': self._extract_homework(openai, anthropic, gemini),
+            'risk_assessment': self._assess_risk_factors(openai, anthropic, gemini),
+            'next_session_focus': self._plan_next_session(openai, anthropic, gemini),
+            'clinical_impressions': self._extract_clinical_impressions(openai, anthropic, gemini),
+            'session_rating': self._calculate_session_rating(openai, anthropic, gemini),
+            'follow_up_actions': self._identify_follow_up_actions(openai, anthropic, gemini)
+        }
+    
+    def _enhance_with_ai_insights(self, summary_data: Dict, raw_content: str, client_name: str) -> Dict:
+        """Enhance existing summary with additional AI-powered insights"""
+        try:
+            if not self.ai_service.is_openai_available():
+                return summary_data
+            
+            # Generate enhanced therapeutic insights
+            insight_prompt = f"""
+            As a senior clinical therapist, provide additional therapeutic insights for this session summary.
+            
+            Client: {client_name}
+            Current Summary Overview: {summary_data.get('session_overview', 'Not available')}
+            
+            Raw Transcript Sample:
+            {raw_content[:2000]}
+            
+            Provide:
+            1. Specific therapeutic breakthroughs or significant moments
+            2. Client's emotional regulation patterns observed
+            3. Transference/countertransference dynamics if present
+            4. Specific behavioral changes noted during session
+            5. Treatment plan modifications recommended
+            
+            Be specific and clinically detailed, avoiding generic statements.
+            """
+            
+            enhanced_insights = self.ai_service._call_openai_llm(insight_prompt)
+            if enhanced_insights:
+                if not summary_data.get('key_insights'):
+                    summary_data['key_insights'] = []
+                summary_data['key_insights'].append(f"Enhanced AI Analysis: {enhanced_insights}")
+            
+            return summary_data
+            
+        except Exception as e:
+            logger.error(f"Error enhancing summary with AI insights: {str(e)}")
+            return summary_data
+    
+    def _format_ai_analysis(self, ai_analysis: Dict) -> Dict:
+        """Format AI analysis response into standardized summary structure"""
+        return {
+            'session_overview': ai_analysis.get('session_overview', 'AI analysis generated session overview'),
+            'key_insights': ai_analysis.get('key_insights', []) if isinstance(ai_analysis.get('key_insights'), list) else [ai_analysis.get('key_insights', 'No insights available')],
+            'therapeutic_progress': {
+                'overall_progress': ai_analysis.get('progress_rating', 'Moderate'),
+                'goal_achievement': ai_analysis.get('goal_progress', 'In Progress'),
+                'specific_improvements': ai_analysis.get('improvements', []) if isinstance(ai_analysis.get('improvements'), list) else []
+            },
+            'session_goals': ai_analysis.get('session_goals', []) if isinstance(ai_analysis.get('session_goals'), list) else [],
+            'interventions_used': ai_analysis.get('interventions', []) if isinstance(ai_analysis.get('interventions'), list) else [],
+            'risk_assessment': {
+                'suicide_risk': ai_analysis.get('suicide_risk', 'Low'),
+                'self_harm_risk': ai_analysis.get('self_harm_risk', 'Low'),
+                'substance_use': ai_analysis.get('substance_use', 'None reported')
+            },
+            'session_rating': {
+                'overall_rating': ai_analysis.get('session_rating', 7),
+                'rating_rationale': ai_analysis.get('rating_explanation', 'Session showed positive therapeutic engagement')
+            },
+            'next_session_focus': ai_analysis.get('next_session_recommendations', []) if isinstance(ai_analysis.get('next_session_recommendations'), list) else [],
+            'clinical_impressions': ai_analysis.get('clinical_impressions', []) if isinstance(ai_analysis.get('clinical_impressions'), list) else []
+        }
+    
+    def _generate_structured_fallback(self, raw_content: str, client_name: str) -> Dict:
+        """Generate structured fallback summary when AI services are unavailable"""
+        # Extract basic information from transcript
+        content_length = len(raw_content)
+        has_emotional_content = any(word in raw_content.lower() for word in ['anxious', 'depressed', 'angry', 'sad', 'happy', 'stressed'])
+        
+        return {
+            'session_overview': f"Therapy session with {client_name}. Session transcript contains {content_length} characters of therapeutic dialogue.",
+            'key_insights': [
+                "Session included therapeutic dialogue and client-therapist interaction",
+                "Emotional content detected" if has_emotional_content else "Clinical discussion documented"
+            ],
+            'therapeutic_progress': {
+                'overall_progress': 'Assessment needed',
+                'goal_achievement': 'Requires clinical review',
+                'specific_improvements': []
+            },
+            'session_goals': ["Requires therapist review to identify specific goals"],
+            'interventions_used': ["Clinical interventions documented in transcript"],
+            'risk_assessment': {
+                'suicide_risk': 'Requires clinical assessment',
+                'self_harm_risk': 'Requires clinical assessment', 
+                'substance_use': 'Not assessed in automated review'
+            },
+            'session_rating': {
+                'overall_rating': 5,
+                'rating_rationale': 'Automated assessment unavailable - requires therapist review'
+            },
+            'next_session_focus': ["Schedule clinical review of session content"],
+            'clinical_impressions': ["Comprehensive clinical review recommended"]
+        }
     
     def _extract_analysis_text(self, analysis_data) -> str:
         """Extract text content from analysis data (handles both string and dict formats)"""
@@ -107,17 +255,45 @@ class SessionSummaryService:
     def _extract_key_insights(self, openai: str, anthropic: str, gemini: str) -> List[str]:
         """Extract key therapeutic insights from the session"""
         insights = []
-        analyses = [openai, anthropic, gemini]
+        analyses = [a for a in [openai, anthropic, gemini] if a and a.strip()]
         
-        insight_patterns = [
-            r'Key insights?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])',
-            r'Important observations?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])',
-            r'Notable points?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])',
-            r'Significant themes?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])'
-        ]
+        # Use AI service for enhanced insight extraction if available
+        if analyses and self.ai_service and self.ai_service.is_openai_available():
+            combined_text = ' '.join(analyses)
+            prompt = f"""
+            As an expert clinical therapist, extract 3-5 key therapeutic insights from this session analysis.
+            
+            Analysis: {combined_text[:2500]}
+            
+            Focus on:
+            - Significant therapeutic breakthroughs or moments
+            - Client's coping mechanisms and emotional patterns
+            - Treatment progress indicators
+            - Behavioral observations
+            - Clinical assessment findings
+            
+            Return only the insights as a numbered list, be specific and avoid generic statements.
+            """
+            ai_insights = self.ai_service._call_openai_llm(prompt)
+            if ai_insights:
+                # Parse numbered list
+                insight_lines = [line.strip() for line in ai_insights.split('\n') if line.strip() and any(c.isdigit() for c in line[:3])]
+                for line in insight_lines[:5]:  # Limit to 5 insights
+                    # Remove numbering and clean up
+                    cleaned = re.sub(r'^\d+\.?\s*', '', line).strip()
+                    if len(cleaned) > 20:
+                        insights.append(cleaned)
         
-        for analysis in analyses:
-            if analysis:
+        # Fallback pattern matching if AI not available
+        if not insights:
+            insight_patterns = [
+                r'Key insights?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])',
+                r'Important observations?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])',
+                r'Notable points?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])',
+                r'Significant themes?[:\s]*(.{50,300}?)(?=\n\n|\n[A-Z])'
+            ]
+            
+            for analysis in analyses:
                 for pattern in insight_patterns:
                     matches = re.finditer(pattern, analysis, re.IGNORECASE | re.DOTALL)
                     for match in matches:
@@ -126,7 +302,7 @@ class SessionSummaryService:
                         if len(insight) > 20 and insight not in insights:
                             insights.append(insight)
         
-        # If no structured insights found, extract from bullet points
+        # If still no insights, extract from bullet points
         if not insights:
             bullet_pattern = r'[•\-\*]\s*(.{20,150}?)(?=\n|$)'
             for analysis in analyses:
