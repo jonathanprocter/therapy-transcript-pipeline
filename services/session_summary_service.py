@@ -230,25 +230,51 @@ class SessionSummaryService:
     
     def _generate_session_overview(self, openai: str, anthropic: str, gemini: str) -> str:
         """Generate a comprehensive session overview"""
-        analyses = [openai, anthropic, gemini]
+        analyses = [a for a in [openai, anthropic, gemini] if a and a.strip()]
         
-        # Look for session overview patterns
+        # Enhanced pattern matching for clinical content
         overview_patterns = [
-            r'SUBJECTIVE[:\s]*(.{100,600}?)(?=OBJECTIVE|ASSESSMENT|$)',
+            r'SUBJECTIVE[:\s]*(.{100,600}?)(?=OBJECTIVE|ASSESSMENT|PLAN|$)',
             r'Session Overview[:\s]*(.{100,500}?)(?=\n\n|\n[A-Z])',
             r'COMPREHENSIVE NARRATIVE SUMMARY[:\s]*(.{100,600}?)(?=\n\n|$)',
-            r'Client presented[:\s]*(.{50,400}?)(?=\.|$)'
+            r'Client presented[:\s]*(.{50,400}?)(?=\.|$)',
+            r'During this session[:\s]*(.{50,400}?)(?=\.|$)',
+            r'The client[:\s]*(.{50,400}?)(?=\.|$)',
+            r'This (\d+[-\w\s]*) session[:\s]*(.{50,400}?)(?=\.|$)'
         ]
         
         for analysis in analyses:
+            for pattern in overview_patterns:
+                match = re.search(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                if match:
+                    # Extract the content (may be in group 1 or 2 depending on pattern)
+                    overview = match.group(2) if len(match.groups()) > 1 and match.group(2) else match.group(1)
+                    overview = overview.strip()
+                    overview = re.sub(r'\s+', ' ', overview)
+                    if len(overview) > 50:  # Ensure meaningful content
+                        # Clean up formatting
+                        overview = re.sub(r'\*+', '', overview)  # Remove asterisks
+                        overview = re.sub(r'^\W+', '', overview)  # Remove leading non-word chars
+                        return overview[:500] + "..." if len(overview) > 500 else overview
+        
+        # If no structured overview found, extract key sentences
+        for analysis in analyses:
             if analysis:
-                for pattern in overview_patterns:
-                    match = re.search(pattern, analysis, re.IGNORECASE | re.DOTALL)
-                    if match:
-                        overview = match.group(1).strip()
-                        overview = re.sub(r'\s+', ' ', overview)
-                        if len(overview) > 50:  # Ensure meaningful content
-                            return overview[:500] + "..." if len(overview) > 500 else overview
+                # Look for sentences with clinical keywords
+                sentences = re.split(r'[.!?]+', analysis)
+                clinical_sentences = []
+                keywords = ['client', 'patient', 'session', 'therapy', 'discussed', 'reported', 'expressed', 'anxiety', 'depression', 'coping', 'progress']
+                
+                for sentence in sentences:
+                    if any(keyword in sentence.lower() for keyword in keywords) and len(sentence.strip()) > 30:
+                        cleaned = re.sub(r'\s+', ' ', sentence.strip())
+                        if len(cleaned) > 50:
+                            clinical_sentences.append(cleaned)
+                            if len(clinical_sentences) >= 2:
+                                break
+                
+                if clinical_sentences:
+                    return '. '.join(clinical_sentences[:2]) + '.'
         
         return "Session focused on therapeutic progress and addressing client concerns."
     
