@@ -118,45 +118,73 @@ class BackgroundScheduler:
 
                 # Check if transcript already exists
                 existing = db.session.query(Transcript).filter_by(
-                    dropbox_path=file_info.get('path_display', filename)
+                    dropbox_path=file_info.get('path', filename)
                 ).first()
 
                 if existing:
-                    logger.debug(f"Transcript already exists: {filename}")
+                    logger.info(f"Transcript already exists for {filename}")
                     return
 
-                # Create transcript record
+                # Download and extract file content
+                file_path = file_info.get('path', filename)
+                file_content = self.dropbox_service.download_file(file_path)
+
+                if not file_content:
+                    logger.error(f"Could not download file content for {filename}")
+                    return
+
+                # Extract text from file content
+                raw_content = ""
+                file_ext = os.path.splitext(filename)[1].lower()
+
+                if file_ext == '.pdf':
+                    try:
+                        import PyPDF2
+                        import io
+                        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+                        for page in pdf_reader.pages:
+                            raw_content += page.extract_text() + "\n"
+                    except Exception as e:
+                        logger.error(f"Error extracting PDF content from {filename}: {str(e)}")
+                        raw_content = "Error extracting PDF content"
+
+                elif file_ext in ['.txt', '.text']:
+                    try:
+                        raw_content = file_content.decode('utf-8')
+                    except Exception as e:
+                        logger.error(f"Error extracting text content from {filename}: {str(e)}")
+                        raw_content = "Error extracting text content"
+                else:
+                    logger.warning(f"Unsupported file type {file_ext} for {filename}")
+                    raw_content = "Unsupported file type"
+
+                # Ensure we have some content
+                if not raw_content or raw_content.strip() == "":
+                    raw_content = "No content extracted"
+
+                # Create new transcript record with content
                 transcript = Transcript(
                     client_id=client.id,
                     original_filename=filename,
-                    dropbox_path=file_info.get('path_display', filename),
-                    file_type=filename.split('.')[-1].lower() if '.' in filename else 'unknown',
+                    dropbox_path=file_path,
+                    file_type=file_ext.replace('.', ''),
+                    raw_content=raw_content,
                     processing_status='pending',
-                    raw_content='',  # Set empty string instead of None to avoid NOT NULL constraint
                     created_at=datetime.now(timezone.utc),
                     updated_at=datetime.now(timezone.utc)
                 )
+
                 db.session.add(transcript)
                 db.session.commit()
 
-                # Log processing start
-                try:
-                    log_entry = ProcessingLog(
-                        transcript_id=transcript.id,
-                        activity_type='file_discovery',
-                        status='info',
-                        message=f'New file discovered: {filename}',
-                        created_at=datetime.now(timezone.utc)
-                    )
-                    db.session.add(log_entry)
-                    db.session.commit()
-                except Exception as e:
-                    logger.warning(f"Error creating log entry: {str(e)}")
-
-                logger.info(f"Added new transcript for processing: {filename}")
+                logger.info(f"Added new transcript for processing: {filename} ({len(raw_content)} chars)")
 
         except Exception as e:
             logger.error(f"Error processing file {file_info.get('name', 'unknown')}: {str(e)}")
+            try:
+                db.session.rollback()
+            except:
+                pass
 
     def _extract_client_name(self, filename):
         """Extract client name from filename"""
