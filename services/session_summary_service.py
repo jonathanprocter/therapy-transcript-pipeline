@@ -269,21 +269,25 @@ class SessionSummaryService:
         # If no structured overview found, extract key sentences
         for analysis in analyses:
             if analysis:
-                # Look for sentences with clinical keywords
-                sentences = re.split(r'[.!?]+', analysis)
-                clinical_sentences = []
-                keywords = ['client', 'patient', 'session', 'therapy', 'discussed', 'reported', 'expressed', 'anxiety', 'depression', 'coping', 'progress']
-                
-                for sentence in sentences:
-                    if any(keyword in sentence.lower() for keyword in keywords) and len(sentence.strip()) > 30:
-                        cleaned = re.sub(r'\s+', ' ', sentence.strip())
-                        if len(cleaned) > 50:
-                            clinical_sentences.append(cleaned)
-                            if len(clinical_sentences) >= 2:
-                                break
-                
-                if clinical_sentences:
-                    return '. '.join(clinical_sentences[:2]) + '.'
+                try:
+                    # Look for sentences with clinical keywords
+                    sentences = re.split(r'[.!?]+', analysis)
+                    clinical_sentences = []
+                    keywords = ['client', 'patient', 'session', 'therapy', 'discussed', 'reported', 'expressed', 'anxiety', 'depression', 'coping', 'progress']
+                    
+                    for sentence in sentences:
+                        if sentence and any(keyword in sentence.lower() for keyword in keywords) and len(sentence.strip()) > 30:
+                            cleaned = re.sub(r'\s+', ' ', sentence.strip())
+                            if len(cleaned) > 50:
+                                clinical_sentences.append(cleaned)
+                                if len(clinical_sentences) >= 2:
+                                    break
+                    
+                    if clinical_sentences:
+                        return '. '.join(clinical_sentences[:2]) + '.'
+                except Exception as e:
+                    # Skip this analysis if processing fails
+                    continue
         
         return "Session focused on therapeutic progress and addressing client concerns."
     
