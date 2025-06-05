@@ -9,7 +9,7 @@ from services.emotional_analysis import EmotionalAnalysis
 # from services.visualization_service import VisualizationService # Removed
 from services.email_summary_service import EmailSummaryService
 from services.manual_upload_service import ManualUploadService
-from services.session_summary_service import SessionSummaryService
+from services.enhanced_session_summary import EnhancedSessionSummaryService
 from sqlalchemy import func, or_, text, literal_column
 from datetime import datetime, timezone
 import logging
@@ -47,7 +47,7 @@ try:
     # visualization_service = VisualizationService() # Removed
     email_summary_service = EmailSummaryService()
     manual_upload_service = ManualUploadService(ai_service=ai_service) # Pass ai_service
-    session_summary_service = SessionSummaryService()
+    session_summary_service = EnhancedSessionSummaryService()
 except Exception as e:
     logger.error(f"Error initializing services: {str(e)}")
     dropbox_service = None

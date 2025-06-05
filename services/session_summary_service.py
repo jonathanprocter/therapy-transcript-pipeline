@@ -229,17 +229,21 @@ class SessionSummaryService:
         return str(analysis_data)
     
     def _clean_text(self, text: str) -> str:
-        """Clean text from formatting issues and syntax errors"""
+        """Clean text from formatting issues and markdown syntax"""
         if not text:
             return ""
         
-        # Remove common syntax issues
-        cleaned = re.sub(r'\\n\\n', ' ', text)  # Remove escaped newlines
-        cleaned = re.sub(r'\\n', ' ', cleaned)  # Remove single escaped newlines
-        cleaned = re.sub(r'\\"', '"', cleaned)  # Fix escaped quotes
-        cleaned = re.sub(r'\\', '', cleaned)    # Remove remaining escapes
-        cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
-        cleaned = re.sub(r'\*+', '', cleaned)   # Remove asterisks
+        # Remove markdown and formatting syntax
+        cleaned = re.sub(r'\\n\\n', '\n', text)    # Convert escaped newlines to actual newlines
+        cleaned = re.sub(r'\\n', '\n', cleaned)    # Convert single escaped newlines
+        cleaned = re.sub(r'\\"', '"', cleaned)     # Fix escaped quotes
+        cleaned = re.sub(r'\\', '', cleaned)       # Remove remaining escapes
+        cleaned = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', cleaned)  # Remove bold/italic markdown
+        cleaned = re.sub(r'#{1,6}\s*', '', cleaned)  # Remove heading markdown
+        cleaned = re.sub(r'^[\s]*[-*+]\s*', '• ', cleaned, flags=re.MULTILINE)  # Convert markdown bullets to proper bullets
+        cleaned = re.sub(r'`([^`]+)`', r'\1', cleaned)  # Remove code formatting
+        cleaned = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', cleaned)  # Remove markdown links
+        cleaned = re.sub(r'\s+', ' ', cleaned)     # Normalize whitespace but preserve single spaces
         cleaned = cleaned.strip()
         
         return cleaned
