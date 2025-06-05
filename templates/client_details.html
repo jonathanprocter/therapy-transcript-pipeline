@@ -5,7 +5,7 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-start mb-4 gap-3">
             <div>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
@@ -13,7 +13,9 @@
                         <li class="breadcrumb-item active">{{ client.name }}</li>
                     </ol>
                 </nav>
-                <h1><i class="fas fa-user me-2"></i>{{ client.name }}</h1>
+                <h1 title="{{ client.name }}">
+                    <i class="fas fa-user me-2"></i><span class="text-truncate d-inline-block" style="max-width: 90%;">{{ client.name }}</span>
+                </h1>
             </div>
             <div class="d-flex gap-2">
                 <a href="{{ url_for('upload') }}" class="btn btn-success">
@@ -126,7 +128,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <strong>{{ transcript.filename }}</strong>
+                                        <strong class="d-inline-block text-truncate" style="max-width: 100%;" title="{{ transcript.filename }}">{{ transcript.filename }}</strong>
                                     </td>
                                     <td>
                                         {% if transcript.processing_status == 'completed' %}
@@ -140,7 +142,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <div class="d-flex gap-1">
+                                        <div class="d-flex gap-1 flex-wrap">
                                             {% if transcript.has_openai %}
                                                 <span class="badge bg-primary" title="OpenAI Analysis">GPT</span>
                                             {% endif %}
@@ -169,21 +171,24 @@
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <a href="{{ url_for('get_transcript_analysis', transcript_id=transcript.id) }}" 
-                                               class="btn btn-outline-primary" title="View Details">
+                                            <button type="button" class="btn btn-outline-primary btn-sm view-analysis-btn"
+                                                    data-bs-toggle="modal" data-bs-target="#transcriptAnalysisModal"
+                                                    data-analysis-url="{{ url_for('get_transcript_analysis', transcript_id=transcript.id) }}"
+                                                    data-transcript-filename="{{ transcript.filename | e }}"
+                                                    title="View Analysis Details">
                                                 <i class="fas fa-eye"></i>
-                                            </a>
+                                            </button>
                                             {% if transcript.processing_status == 'completed' and (transcript.has_openai or transcript.has_anthropic or transcript.has_gemini) %}
-                                            <button type="button" class="btn btn-outline-success" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#emailModal{{ transcript.id }}" 
+                                            <button type="button" class="btn btn-outline-success btn-sm"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#emailModal{{ transcript.id }}"
                                                     title="Email Summary">
                                                 <i class="fas fa-envelope"></i>
                                             </button>
                                             {% endif %}
                                             {% if transcript.processing_status == 'completed' %}
-                                            <a href="{{ url_for('reprocess_transcript', transcript_id=transcript.id) }}" 
-                                               class="btn btn-outline-warning" title="Reprocess">
+                                            <a href="{{ url_for('reprocess_transcript', transcript_id=transcript.id) }}"
+                                               class="btn btn-outline-warning btn-sm" title="Reprocess">
                                                 <i class="fas fa-redo"></i>
                                             </a>
                                             {% endif %}
@@ -342,6 +347,31 @@
     </div>
 </div>
 
+<!-- Transcript Analysis Modal -->
+<div class="modal fade" id="transcriptAnalysisModal" tabindex="-1" aria-labelledby="transcriptAnalysisModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"> <!-- modal-xl for more space, modal-dialog-scrollable for long content -->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="transcriptAnalysisModalLabel">Transcript Analysis Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="transcriptAnalysisModalBody">
+                <!-- Initial loading state -->
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading analysis...</span>
+                    </div>
+                    <p class="mt-2">Loading analysis...</p>
+                </div>
+                <!-- Analysis content will be injected here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Email Loading Indicator -->
 <div class="modal fade" id="emailLoadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
@@ -361,6 +391,92 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Transcript Analysis Modal Logic
+    const analysisModal = document.getElementById('transcriptAnalysisModal');
+    if (analysisModal) {
+        analysisModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const analysisUrl = button.getAttribute('data-analysis-url');
+            const transcriptFilename = button.getAttribute('data-transcript-filename');
+
+            const modalTitle = analysisModal.querySelector('.modal-title');
+            const modalBody = analysisModal.querySelector('#transcriptAnalysisModalBody');
+
+            modalTitle.textContent = 'Analysis for: ' + transcriptFilename;
+            modalBody.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                    <p class="mt-2">Fetching analysis details...</p>
+                </div>`;
+
+            fetch(analysisUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok. Status: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    let contentHtml = '<div class="analysis-content">';
+                    // Helper function to render analysis sections
+                    const renderSection = (title, analysisData) => {
+                        let sectionHtml = `<h6 class="mt-3 fw-bold">${title}</h6>`; // Made title bold
+                        if (analysisData && typeof analysisData === 'object' && Object.keys(analysisData).length > 0) {
+                            sectionHtml += '<dl class="row">';
+                            for (const [key, value] of Object.entries(analysisData)) {
+                                // Prettify key: replace underscores, capitalize
+                                let prettyKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                sectionHtml += `<dt class="col-sm-3 text-truncate" title="${prettyKey}">${prettyKey}</dt>`;
+                                // Check if value is an object to pretty print, or long string to wrap
+                                if (typeof value === 'object') {
+                                    sectionHtml += `<dd class="col-sm-9"><pre><code>${JSON.stringify(value, null, 2)}</code></pre></dd>`;
+                                } else if (typeof value === 'string' && value.length > 100) {
+                                    sectionHtml += `<dd class="col-sm-9" style="white-space: pre-wrap; word-wrap: break-word;">${value || 'N/A'}</dd>`;
+                                } else {
+                                    sectionHtml += `<dd class="col-sm-9">${value || 'N/A'}</dd>`;
+                                }
+                            }
+                            sectionHtml += '</dl>';
+                        } else if (typeof analysisData === 'string' && analysisData.trim() !== '') {
+                            sectionHtml += `<p>${analysisData}</p>`;
+                        }
+                        else {
+                            sectionHtml += '<p class="text-muted">No data available for this section.</p>'; // More specific message
+                        }
+                        return sectionHtml;
+                    };
+
+                    contentHtml += renderSection('OpenAI Analysis', data.openai_analysis);
+                    contentHtml += renderSection('Anthropic Analysis', data.anthropic_analysis);
+                    contentHtml += renderSection('Gemini Analysis', data.gemini_analysis);
+
+                    contentHtml += '<h6 class="mt-3 fw-bold">Sentiment Score</h6>';
+                    contentHtml += data.sentiment_score ? `<p>${data.sentiment_score}</p>` : '<p class="text-muted">N/A</p>';
+
+                    contentHtml += '<h6 class="mt-3 fw-bold">Key Themes</h6>';
+                    if (data.key_themes && data.key_themes.length > 0) {
+                        contentHtml += '<ul class="list-group list-group-flush">'; // Using list-group for better spacing
+                        data.key_themes.forEach(theme => { contentHtml += `<li class="list-group-item">${theme}</li>`; });
+                        contentHtml += '</ul>';
+                    } else {
+                        contentHtml += '<p class="text-muted">No key themes identified.</p>';
+                    }
+
+                    contentHtml += '<h6 class="mt-3 fw-bold">Therapy Insights</h6>';
+                    contentHtml += data.therapy_insights ? `<p style="white-space: pre-wrap; word-wrap: break-word;">${data.therapy_insights}</p>` : '<p class="text-muted">N/A</p>';
+
+                    contentHtml += '<h6 class="mt-3 fw-bold">Progress Indicators</h6>';
+                    contentHtml += data.progress_indicators ? `<p style="white-space: pre-wrap; word-wrap: break-word;">${data.progress_indicators}</p>` : '<p class="text-muted">N/A</p>';
+
+                    contentHtml += '</div>'; // End of analysis-content
+                    modalBody.innerHTML = contentHtml;
+                })
+                .catch(error => {
+                    modalBody.innerHTML = `<div class="alert alert-danger">Failed to load analysis: ${error.message}</div>`;
+                });
+        });
+    }
+
     // Email form handling with loading indicators
     const emailForms = document.querySelectorAll('form[action*="send_email_summary"]');
     const emailLoadingModal = new bootstrap.Modal(document.getElementById('emailLoadingModal'));

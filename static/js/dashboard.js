@@ -243,6 +243,27 @@ function triggerManualScan() {
 
 // Load processing logs
 function loadProcessingLogs() {
+    const activityFeed = document.querySelector('.activity-feed');
+    const refreshButton = document.getElementById('refreshActivityBtn'); // Assuming this ID will be added to the button in dashboard.html
+    let originalButtonHtml; // Declare here to be accessible in finally
+
+    if (refreshButton) {
+        refreshButton.disabled = true;
+        // Optional: Change button text to show loading state
+        originalButtonHtml = refreshButton.innerHTML; // Store original HTML
+        refreshButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+    }
+
+    if (activityFeed) {
+        activityFeed.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2 mb-0">Loading recent activity...</p>
+            </div>`;
+    }
+
     fetch('/api/processing-logs')
     .then(response => {
         if (!response.ok) {
@@ -253,43 +274,35 @@ function loadProcessingLogs() {
     .then(data => {
         console.log('Processing logs loaded:', data);
         
-        // Validate that data is an array, handle edge cases
         let logs = [];
         if (Array.isArray(data)) {
             logs = data;
-        } else if (data && typeof data === 'object') {
-            console.warn('Processing logs returned object instead of array:', data);
-            logs = [];
         } else {
             console.warn('Processing logs returned unexpected data type:', typeof data, data);
-            logs = [];
+            logs = []; // Default to empty array if data is not as expected
         }
         
-        // Update the activity feed
-        const activityFeed = document.querySelector('.activity-feed');
         if (activityFeed) {
             let html = '';
-            
             if (logs.length > 0) {
                 logs.slice(0, 10).forEach(log => {
                     try {
-                        const icon = log.status === 'success' ? 'fas fa-check-circle text-success' :
-                                    log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
-                                    'fas fa-info-circle text-info';
-
-                        const date = log.created_at ? new Date(log.created_at).toLocaleString() : 'Unknown time';
-                        const message = log.message || 'No message available';
+                        const iconClass = log.status === 'success' ? 'fas fa-check-circle text-success' :
+                                        log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
+                                        'fas fa-info-circle text-info';
+                        const dateStr = log.created_at ? new Date(log.created_at).toLocaleString() : 'Unknown time';
+                        const messageText = log.message || 'No message available';
 
                         html += `
                             <div class="activity-item mb-3 pb-3 border-bottom">
                                 <div class="d-flex align-items-start">
                                     <div class="activity-icon me-3">
-                                        <i class="${icon}"></i>
+                                        <i class="${iconClass}"></i>
                                     </div>
                                     <div class="activity-content flex-grow-1">
-                                        <div class="activity-message">${message}</div>
+                                        <div class="activity-message">${messageText}</div>
                                         <div class="activity-meta text-muted small">
-                                            <i class="fas fa-clock me-1"></i>${date}
+                                            <i class="fas fa-clock me-1"></i>${dateStr}
                                         </div>
                                     </div>
                                 </div>
@@ -297,22 +310,34 @@ function loadProcessingLogs() {
                         `;
                     } catch (logError) {
                         console.warn('Error processing individual log entry:', logError, log);
+                        // Optionally skip this log or add a placeholder error entry
                     }
                 });
             }
-
             activityFeed.innerHTML = html || '<div class="text-center py-4"><i class="fas fa-history fa-2x text-muted mb-2"></i><p class="text-muted mb-0">No recent activity</p></div>';
         }
     })
     .catch(error => {
         console.error('Error loading processing logs:', error);
-        // Ensure error is properly handled without throwing unhandled promise rejection
-        const activityFeed = document.querySelector('.activity-feed');
         if (activityFeed) {
-            activityFeed.innerHTML = '<div class="text-center py-4"><i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i><p class="text-muted mb-0">Unable to load activity logs</p></div>';
+            activityFeed.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                    <p class="text-muted mb-0">Unable to load activity logs.</p>
+                    <p class="text-danger small">${error.message}</p>
+                </div>`;
         }
-        // Return empty array to prevent further errors
-        return [];
+        // No need to return empty array here as it's handled by the UI update
+    })
+    .finally(() => {
+        if (refreshButton) {
+            refreshButton.disabled = false;
+            if(originalButtonHtml) { // Restore original button HTML
+                 refreshButton.innerHTML = originalButtonHtml;
+            } else { // Fallback if originalButtonHtml wasn't captured (should not happen)
+                 refreshButton.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Refresh Activity';
+            }
+        }
     });
 }
 
