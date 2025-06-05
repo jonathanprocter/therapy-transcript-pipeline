@@ -91,7 +91,9 @@
                             {% for client in clients %}
                             <tr>
                                 <td>
-                                    <strong>{{ client.name }}</strong>
+                                    <a href="/client/{{ client.id }}" class="text-decoration-none">
+                                        <strong>{{ client.name }}</strong>
+                                    </a>
                                 </td>
                                 <td>
                                     <span class="badge bg-primary">{{ client.transcript_count }} sessions</span>
