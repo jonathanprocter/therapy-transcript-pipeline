@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', function () {
     const filterForm = document.getElementById('filterForm');
     const keywordSearchInput = document.getElementById('keywordSearchInput');
