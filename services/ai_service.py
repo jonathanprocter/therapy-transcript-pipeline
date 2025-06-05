@@ -438,3 +438,35 @@ class AIService:
     def is_gemini_available(self) -> bool:
         """Check if Gemini client is initialized and available."""
         return self.gemini_client is not None
+    
+    def generate_openai_response(self, prompt: str, response_format: str = "text") -> Optional[str]:
+        """
+        Generate response using OpenAI with specified format
+        """
+        try:
+            if not self.openai_client:
+                return None
+            
+            messages = [{"role": "user", "content": prompt}]
+            
+            if response_format == "json_object":
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=2000
+                )
+            else:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=2000
+                )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"OpenAI response generation error: {str(e)}")
+            return None

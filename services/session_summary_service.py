@@ -83,7 +83,7 @@ class SessionSummaryService:
             """
             
             if self.ai_service.is_openai_available():
-                response = self.ai_service._call_openai_llm(prompt, "json_object")
+                response = self.ai_service.generate_openai_response(prompt, "json_object")
                 if response:
                     import json
                     ai_analysis = json.loads(response)
@@ -139,7 +139,7 @@ class SessionSummaryService:
             Be specific and clinically detailed, avoiding generic statements.
             """
             
-            enhanced_insights = self.ai_service._call_openai_llm(insight_prompt)
+            enhanced_insights = self.ai_service.generate_openai_response(insight_prompt)
             if enhanced_insights:
                 if not summary_data.get('key_insights'):
                     summary_data['key_insights'] = []
@@ -274,7 +274,7 @@ class SessionSummaryService:
             
             Return only the insights as a numbered list, be specific and avoid generic statements.
             """
-            ai_insights = self.ai_service._call_openai_llm(prompt)
+            ai_insights = self.ai_service.generate_openai_response(prompt)
             if ai_insights:
                 # Parse numbered list
                 insight_lines = [line.strip() for line in ai_insights.split('\n') if line.strip() and any(c.isdigit() for c in line[:3])]
