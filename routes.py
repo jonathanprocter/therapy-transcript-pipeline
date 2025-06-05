@@ -337,8 +337,12 @@ def test_dropbox():
         if not connection_test:
             return make_error_response("Dropbox connection failed", error_code="CONNECTION_ERROR", details="Authentication or network issue", status_code=502)
 
-        account_name = dropbox_service.get_user_account_display_name() or 'Unknown' # Updated
-        monitor_folder_path = dropbox_service.get_monitor_folder() # Updated
+        try:
+            account = dropbox_service.client.users_get_current_account()
+            account_name = account.name.display_name
+        except:
+            account_name = 'Unknown'
+        monitor_folder_path = dropbox_service.monitor_folder
         
         folder_status = f"Monitoring folder: {monitor_folder_path}"
         files_count = 0

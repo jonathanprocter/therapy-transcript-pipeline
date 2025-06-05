@@ -132,6 +132,7 @@ class BackgroundScheduler:
                     dropbox_path=file_info.get('path_display', filename),
                     file_type=filename.split('.')[-1].lower() if '.' in filename else 'unknown',
                     processing_status='pending',
+                    raw_content='',  # Set empty string instead of None to avoid NOT NULL constraint
                     created_at=datetime.now(timezone.utc)
                 )
                 db.session.add(transcript)

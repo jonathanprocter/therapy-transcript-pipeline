@@ -312,6 +312,21 @@ class DropboxService:
             logger.error(f"Error in fallback file listing: {str(e)}")
             return []
 
+    def get_user_account_display_name(self) -> str:
+        """Get the display name of the current Dropbox account"""
+        try:
+            if not self.client:
+                return "Unknown"
+            account = self.client.users_get_current_account()
+            return account.name.display_name
+        except Exception as e:
+            logger.error(f"Error getting account name: {str(e)}")
+            return "Unknown"
+
+    def get_monitor_folder(self) -> str:
+        """Get the current monitor folder path"""
+        return self.monitor_folder
+
     def create_backup_folder(self, folder_name: str) -> bool:
         """Create a backup folder for processed files"""
         try:
