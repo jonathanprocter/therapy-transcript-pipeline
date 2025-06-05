@@ -180,31 +180,31 @@ def api_system_stats():
             'failed_processing': 0
         }
     }
-    
+
     try:
         # Ensure database session is fresh
         db.session.close()
-        
+
         # Get system statistics with individual error handling
         try:
             total_clients = db.session.query(Client).count()
         except Exception as e:
             logger.warning(f"Error counting clients: {str(e)}")
             total_clients = 0
-            
+
         try:
             total_transcripts = db.session.query(Transcript).count()
         except Exception as e:
             logger.warning(f"Error counting transcripts: {str(e)}")
             total_transcripts = 0
-            
+
         try:
             pending_transcripts = db.session.query(Transcript)\
                 .filter(Transcript.processing_status == 'pending').count()
         except Exception as e:
             logger.warning(f"Error counting pending transcripts: {str(e)}")
             pending_transcripts = 0
-            
+
         try:
             failed_transcripts = db.session.query(Transcript)\
                 .filter(Transcript.processing_status == 'failed').count()
@@ -347,7 +347,7 @@ def get_processing_logs():
     try:
         # Ensure database session is fresh
         db.session.close()
-        
+
         logs = db.session.query(ProcessingLog)\
             .order_by(ProcessingLog.created_at.desc())\
             .limit(50).all()
@@ -422,7 +422,7 @@ def test_dropbox():
 
         # Test connection
         connection_test = dropbox_service.test_connection()
-        
+
         if not connection_test:
             return jsonify({
                 'success': False,
@@ -502,18 +502,33 @@ def internal_error(error):
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now(timezone.utc).isoformat(),
-        'services': {
-            'database': True,  # If we got here, DB is working
-            'dropbox': dropbox_service is not None,
-            'ai_service': ai_service is not None,
-            'notion': notion_service is not None,
-            'analytics': analytics_service is not None,
-            'manual_upload': manual_upload_service is not None
-        }
-    })
+    try:
+        # Check database connection
+        with app.app_context():
+            db.session.execute(text('SELECT 1'))
+
+        # Check Dropbox connection
+        dropbox_status = 'disconnected'
+        try:
+            from services.dropbox_service import DropboxService
+            dropbox_service = DropboxService()
+            if dropbox_service.test_connection():
+                dropbox_status = 'connected'
+        except Exception as e:
+            logger.warning(f"Dropbox health check failed: {str(e)}")
+
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'database': 'connected',
+            'dropbox': dropbox_status
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -522,25 +537,25 @@ def upload():
         if not manual_upload_service: 
             flash('File upload service is currently unavailable. Please try again later.', 'error')
             return render_template('upload.html') 
-        
+
         if 'transcript' not in request.files:
             flash('No file part selected.', 'error')
             return render_template('upload.html') 
-        
+
         file = request.files['transcript']
         if not file or not file.filename: 
             flash('No file selected or file has no name.', 'error')
             return render_template('upload.html')
-        
+
         result = manual_upload_service.handle_file_upload(file)
-        
+
         if result.get('success'):
             flash(result.get('message', 'File processed successfully!'), 'success')
             return redirect(url_for('dashboard')) 
         else:
             flash(result.get('error', 'An unknown error occurred during file processing.'), 'error')
             return render_template('upload.html') 
-    
+
     return render_template('upload.html')
 
 @app.route('/client/<int:client_id>/visualization')
@@ -721,22 +736,22 @@ def client_details(client_id):
         if not client:
             flash('Client not found', 'error')
             return redirect(url_for('dashboard'))
-        
+
         # Get all transcripts for this client - ordered chronologically (newest first)
         transcripts = db.session.query(Transcript).filter_by(client_id=client_id).order_by(Transcript.session_date.desc(), Transcript.created_at.desc()).all()
-        
+
         # Calculate statistics
         total_sessions = len(transcripts)
         completed_sessions = len([t for t in transcripts if t.processing_status == 'completed'])
         synced_sessions = len([t for t in transcripts if t.notion_synced])
-        
+
         # Prepare transcript data with analysis status
         transcript_data = []
         for transcript in transcripts:
             has_openai = bool(transcript.openai_analysis)
             has_anthropic = bool(transcript.anthropic_analysis)
             has_gemini = bool(transcript.gemini_analysis)
-            
+
             transcript_data.append({
                 'id': transcript.id,
                 'filename': transcript.original_filename,
@@ -748,21 +763,20 @@ def client_details(client_id):
                 'has_gemini': has_gemini,
                 'ai_providers': f"{int(has_openai) + int(has_anthropic) + int(has_gemini)}/3"
             })
-        
+
         client_stats = {
             'total_sessions': total_sessions,
             'completed_sessions': completed_sessions,
             'synced_sessions': synced_sessions,
             'notion_connected': bool(client.notion_database_id)
         }
-        
+
         return render_template('client_details.html', 
                              client=client,
                              transcripts=transcript_data,
                              client_stats=client_stats)
-        
+
     except Exception as e:
         logger.error(f"Error loading client details: {str(e)}")
         flash(f"Error loading client details: {str(e)}", 'error')
         return redirect(url_for('dashboard'))
-

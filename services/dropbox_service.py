@@ -34,10 +34,12 @@ class DropboxService:
 
             # Test the connection immediately
             try:
-                self.client.users_get_current_account()
-                logger.info("Dropbox service initialized and authenticated successfully")
+                account = self.client.users_get_current_account()
+                logger.info(f"Dropbox service initialized and authenticated successfully for {account.name.display_name}")
             except dropbox.exceptions.AuthError as e:
                 logger.error(f"Dropbox authentication failed: {str(e)}")
+                logger.error("Please check if your Dropbox access token is valid and not expired")
+                logger.error("Generate a new token at: https://www.dropbox.com/developers/apps")
                 self.client = None
 
         except Exception as e:
@@ -67,7 +69,7 @@ class DropboxService:
     def list_files(self, folder_path: str = None) -> List[Dict]:
         """List files in the specified folder"""
         if not self.client:
-            logger.error("Dropbox client not initialized")
+            logger.error("Dropbox client not initialized - check access token configuration")
             return []
 
         if folder_path is None:
