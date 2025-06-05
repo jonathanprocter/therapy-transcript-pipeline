@@ -745,8 +745,10 @@ def search_transcripts():
 
         query = query.order_by(Transcript.session_date.desc())
         
-        paginated_results = query.paginate(page=page, per_page=per_page, error_out=False)
-        transcripts_page_items = paginated_results.items
+        # Use offset and limit for pagination instead of paginate method
+        offset = (page - 1) * per_page
+        transcripts_page_items = query.offset(offset).limit(per_page).all()
+        total_count = query.count()
 
         results_list = []
         for t in transcripts_page_items:
@@ -761,11 +763,12 @@ def search_transcripts():
                 "sentiment_score": t.sentiment_score,
             })
 
+        total_pages = (total_count + per_page - 1) // per_page  # Calculate total pages
         pagination_meta = {
-            "page": paginated_results.page,
-            "per_page": paginated_results.per_page,
-            "total_pages": paginated_results.pages,
-            "total_items": paginated_results.total
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages,
+            "total_items": total_count
         }
         
         return make_success_response(data={"transcripts": results_list, "pagination": pagination_meta})
