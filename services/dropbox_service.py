@@ -89,9 +89,11 @@ class DropboxService:
 
             for entry in result.entries:
                 if isinstance(entry, dropbox.files.FileMetadata):
-                    # Check if file type is supported
+                    # Check if file type is supported and exclude supervision files
                     file_ext = os.path.splitext(entry.name)[1].lower()
-                    if file_ext in Config.SUPPORTED_FILE_TYPES:
+                    if (file_ext in Config.SUPPORTED_FILE_TYPES and 
+                        'supervision' not in entry.name.lower() and
+                        'Supervision' not in entry.name):
                         files.append({
                             'name': entry.name,
                             'path': entry.path_lower,
@@ -106,7 +108,9 @@ class DropboxService:
                 for entry in result.entries:
                     if isinstance(entry, dropbox.files.FileMetadata):
                         file_ext = os.path.splitext(entry.name)[1].lower()
-                        if file_ext in Config.SUPPORTED_FILE_TYPES:
+                        if (file_ext in Config.SUPPORTED_FILE_TYPES and 
+                            'supervision' not in entry.name.lower() and
+                            'Supervision' not in entry.name):
                             files.append({
                                 'name': entry.name,
                                 'path': entry.path_lower,
