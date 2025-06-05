@@ -6,7 +6,6 @@ from services.ai_service import AIService
 from services.notion_service import NotionService
 from services.analytics_service import AnalyticsService
 from services.emotional_analysis import EmotionalAnalysis
-# VisualizationService has been removed - using AnalyticsService instead
 from services.email_summary_service import EmailSummaryService
 from datetime import datetime, timezone
 import logging
@@ -22,7 +21,6 @@ try:
     analytics_service = AnalyticsService()
     emotional_analyzer = EmotionalAnalysis()
     email_summary_service = EmailSummaryService()
-    # Import ManualUploadService
     from services.manual_upload_service import ManualUploadService
     manual_upload_service = ManualUploadService(ai_service=ai_service)
 except Exception as e:
