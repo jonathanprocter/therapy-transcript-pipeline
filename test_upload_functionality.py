@@ -6,10 +6,10 @@ Test the upload functionality with the new OpenAI API key
 import os
 import sys
 
-# Set the new OpenAI API key
-os.environ['OPENAI_API_KEY'] = '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'
-os.environ['NOTION_INTEGRATION_SECRET'] = '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'
-os.environ['NOTION_DATABASE_ID'] = '2049f30def818033b42af330a18aa313'
+# Use placeholder API keys
+os.environ.setdefault('OPENAI_API_KEY', 'dummy')
+os.environ.setdefault('NOTION_INTEGRATION_SECRET', 'dummy')
+os.environ.setdefault('NOTION_DATABASE_ID', 'dummy')
 
 def test_openai_connection():
     """Test OpenAI connection with new API key"""
