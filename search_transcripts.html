@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Search Transcripts - Therapy Transcript Processor{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4"> {# Use container-fluid for more space if sidebar is used #}
+    <div class="row mb-3">
+        <div class="col-12">
+            <h1><i class="fas fa-search me-2"></i>Search & Filter Transcripts</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Filter Sidebar -->
+        <div class="col-lg-3 col-md-4 mb-4">
+            <form id="filterForm">
+                <h5><i class="fas fa-filter me-2"></i>Filters</h5>
+                <hr>
+
+                <div class="mb-3">
+                    <label for="keywordSearchInput" class="form-label">Keyword Search</label>
+                    <input type="text" id="keywordSearchInput" class="form-control" placeholder="Content, client, filename...">
+                </div>
+
+                <div class="mb-3">
+                    <label for="filterClient" class="form-label">Client</label>
+                    <select id="filterClient" class="form-select">
+                        <option value="" selected>All Clients</option>
+                        {% for client in clients %}
+                        <option value="{{ client.id }}">{{ client.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Session Date Range</label>
+                    <input type="date" id="filterStartDate" class="form-control mb-2" aria-label="Start Date">
+                    <input type="date" id="filterEndDate" class="form-control" aria-label="End Date">
+                </div>
+
+                <div class="mb-3">
+                    <label for="filterStatus" class="form-label">Processing Status</label>
+                    <select id="filterStatus" class="form-select">
+                        <option value="" selected>All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="filterThemes" class="form-label">Key Themes (AND logic)</label>
+                    <input type="text" id="filterThemes" class="form-control" placeholder="e.g., anxiety, coping">
+                    <small class="form-text text-muted">Comma-separated. Finds transcripts with ALL listed themes.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Sentiment Score</label>
+                    <div class="input-group">
+                         <input type="number" id="filterMinSentiment" class="form-control" placeholder="Min" step="0.01" min="0" max="1">
+                         <input type="number" id="filterMaxSentiment" class="form-control" placeholder="Max" step="0.01" min="0" max="1">
+                    </div>
+                    <small class="form-text text-muted">Range from 0.0 to 1.0 (if applicable).</small>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" id="applyFiltersBtn" class="btn btn-primary"><i class="fas fa-search me-1"></i>Apply & Search</button>
+                    <button type="button" id="clearFiltersBtn" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>Clear Filters</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Main Content Area for Results -->
+        <div class="col-lg-9 col-md-8">
+            <div id="searchResultsContainer">
+                <div class="alert alert-info" role="alert">
+                    Use the filters and search bar to find transcripts. Results will appear here.
+                </div>
+            </div>
+            <nav id="paginationContainer" aria-label="Search results navigation" class="mt-4"></nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }} {# Include scripts from base.html if any #}
+<script src="{{ url_for('static', filename='js/search_transcripts.js') }}"></script>
+{% endblock %}

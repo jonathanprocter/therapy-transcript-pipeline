@@ -1,0 +1,192 @@
+<!-- Test comment -->
+{% extends "base.html" %}
+
+{% block title %}Upload Transcript - Therapy Transcript Processor{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Therapy Transcript</h3>
+                    </div>
+                    <div class="card-body">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'warning' }} alert-dismissible fade show" role="alert">
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                            <div class="mb-3">
+                                <label for="transcript" class="form-label">Select Transcript File</label>
+                                <input type="file" class="form-control" id="transcript" name="transcript" 
+                                       accept=".pdf,.txt,.docx" required>
+                                <div class="form-text">
+                                    Supported formats: PDF, TXT, DOCX (Maximum size: 16MB)
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary" id="uploadButton">
+                                    <i class="fas fa-cloud-upload-alt me-2"></i>Process Transcript
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="mt-4">
+                            <h5 class="mb-3">Processing Pipeline Overview</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title"><i class="fas fa-file-alt me-2"></i>1. Text Extraction</h6>
+                                            <p class="card-text small">Extracts text content from the uploaded document.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title"><i class="fas fa-brain me-2"></i>2. AI Analysis</h6>
+                                            <p class="card-text small">Processes with OpenAI, Anthropic, and Gemini for comprehensive insights.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title"><i class="fas fa-user-tag me-2"></i>3. Client Identification</h6>
+                                            <p class="card-text small">Identifies client name and session date from the content.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title"><i class="fas fa-database me-2"></i>4. Notion Integration</h6>
+                                            <p class="card-text small">Saves processed insights to the client's Notion database.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadButton = document.getElementById('uploadButton');
+        
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const fileInput = document.getElementById('transcript'); // Using existing ID 'transcript'
+                const file = fileInput.files[0];
+                
+                if (!file) {
+                    if (window.showAlert) {
+                        window.showAlert('Please select a file to upload.', 'warning');
+                    } else {
+                        alert('Please select a file to upload.'); // Fallback
+                    }
+                    return;
+                }
+                
+                const filename = file.name;
+                // Use the global AI loading indicator if available
+                if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.show === 'function') {
+                     aiLoadingIndicator.show(filename);
+                } else if (window.showLoading && typeof window.showLoading === 'function') { // Fallback to simpler global loading
+                    window.showLoading(); 
+                }
+                
+                if(uploadButton) {
+                    uploadButton.disabled = true;
+                    uploadButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...';
+                }
+                
+                const formData = new FormData();
+                formData.append('transcript', file);
+                
+                fetch(uploadForm.action || window.location.pathname, { 
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        simulateProcessingStages();
+                        // If server redirects, browser handles it. 
+                        // If server re-renders page with flash messages, they should appear.
+                        // We might need to hide indicators if no redirect happens.
+                        if (!response.redirected) { 
+                           if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.hide === 'function') {
+                                window.aiLoadingIndicator.hide();
+                           } else if (window.hideLoading && typeof window.hideLoading === 'function') {
+                                window.hideLoading();
+                           }
+                        }
+                        // Server is expected to redirect on success or re-render with messages on validation fail.
+                        // No client-side redirect needed here.
+                        return; 
+                    } else {
+                        // Handle non-OK responses (e.g., 400, 413, 500)
+                        if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.error === 'function') {
+                            aiLoadingIndicator.error('upload', `Upload failed. Server responded with status: ${response.status}`);
+                        } else if (window.showAlert) {
+                            window.showAlert(`Upload failed. Status: ${response.status}`, 'danger');
+                        }
+                        if(uploadButton) {
+                            uploadButton.disabled = false;
+                            uploadButton.innerHTML = '<i class="fas fa-cloud-upload-alt me-2"></i>Process Transcript';
+                        }
+                        throw new Error(`Server error: ${response.status}`); // Caught by .catch
+                    }
+                })
+                .catch(error => {
+                    // Catches network errors or errors thrown from .then()
+                    console.error('Upload submission fetch error:', error);
+                    // Avoid double messaging if aiLoadingIndicator already showed an error
+                    if (!(window.aiLoadingIndicator && typeof window.aiLoadingIndicator.error === 'function' && error.message.includes('Upload failed'))) {
+                        if (window.showAlert) {
+                            window.showAlert('Upload Error: ' + error.message, 'danger');
+                        }
+                    }
+                    
+                    if(uploadButton) { 
+                        uploadButton.disabled = false;
+                        uploadButton.innerHTML = '<i class="fas fa-cloud-upload-alt me-2"></i>Process Transcript';
+                    }
+                });
+            });
+        }
+        
+        function simulateProcessingStages() {
+            if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.nextStage === 'function') {
+                const DURATION_PER_STAGE = 300; 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 1); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 2); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 3); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 4); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 5); 
+            }
+        }
+    });
+</script>
+{% endblock %}

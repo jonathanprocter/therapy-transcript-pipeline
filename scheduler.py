@@ -230,28 +230,85 @@ def process_new_files():
                     
                     # Process with AI if we have content
                     if transcript.raw_content and ai_service:
-                        analysis_result = ai_service.analyze_transcript(transcript.raw_content)
+                        # Use the new detailed analysis method
+                        client_name_for_analysis = transcript.client.name if transcript.client else "Unknown Client"
+                        analysis_result = ai_service.analyze_transcript_detailed(transcript.raw_content, client_name_for_analysis)
                         
                         if analysis_result:
-                            transcript.openai_analysis = analysis_result.get('openai_analysis')
-                            transcript.anthropic_analysis = analysis_result.get('anthropic_analysis')
-                            transcript.sentiment_score = analysis_result.get('sentiment_score', 0.0)
-                            transcript.key_themes = analysis_result.get('key_themes')
-                            transcript.therapy_insights = analysis_result.get('therapy_insights')
+                            # Assuming analyze_transcript_detailed returns a flat dict with all fields
+                            # Existing fields (adapt if structure from analyze_transcript_detailed is different)
+                            # For now, we assume the new method is the primary source for OpenAI based insights.
+                            # If other providers are used by other methods, that logic would remain separate.
+                            # The `raw_openai_clinical_note` could be stored if a model field exists for it.
+                            # transcript.openai_analysis = analysis_result.get('raw_openai_clinical_note') # Or a more structured part if available
+
+                            transcript.key_themes = analysis_result.get('key_themes', [])
+                            transcript.therapy_insights = analysis_result.get('therapy_insights_summary') # Using the summary from detailed analysis
+                            transcript.sentiment_score = analysis_result.get('sentiment_score')
+
+                            # New fields for Case Conceptualization
+                            transcript.session_complaints = analysis_result.get('session_complaints', [])
+                            transcript.session_concerns = analysis_result.get('session_concerns', [])
+                            transcript.session_action_items = analysis_result.get('session_action_items', [])
+                            transcript.session_presentation_summary = analysis_result.get('session_presentation_summary')
+                            
                             transcript.processing_status = 'completed'
                             transcript.processed_at = datetime.now(timezone.utc)
-                            
-                            logger.info(f"Successfully processed: {transcript.original_filename}")
-                        else:
+                            db.session.commit() # Commit transcript updates first
+                            logger.info(f"Successfully processed and saved transcript: {transcript.original_filename}")
+
+                            # Attempt to update Case Conceptualization
+                            try:
+                                client = transcript.client
+                                if not client: # Should not happen if transcript.client_id is set
+                                     client = db.session.query(Client).get(transcript.client_id)
+
+                                if client:
+                                    existing_conceptualization = client.current_case_conceptualization
+                                    
+                                    # Prepare current session data for conceptualization prompt
+                                    # This dict should match what _format_session_for_conceptualization_prompt expects
+                                    current_session_analysis_dict = {
+                                        'session_date': transcript.session_date.isoformat() if transcript.session_date else datetime.now(timezone.utc).isoformat(), # Ensure it's a string
+                                        'session_complaints': transcript.session_complaints,
+                                        'session_concerns': transcript.session_concerns,
+                                        'key_themes': transcript.key_themes,
+                                        'session_presentation_summary': transcript.session_presentation_summary,
+                                        'therapy_insights': transcript.therapy_insights, # This is the summary string
+                                        'session_action_items': transcript.session_action_items
+                                    }
+                                    
+                                    logger.info(f"Updating case conceptualization for client ID: {client.id} based on transcript ID: {transcript.id}")
+                                    updated_conceptualization_text = ai_service.update_case_conceptualization(
+                                        existing_conceptualization, 
+                                        [current_session_analysis_dict] # Pass as a list of one session
+                                    )
+
+                                    if updated_conceptualization_text:
+                                        client.current_case_conceptualization = updated_conceptualization_text
+                                        client.case_conceptualization_updated_at = datetime.now(timezone.utc)
+                                        db.session.commit() # Commit client update
+                                        logger.info(f"Case conceptualization updated for client ID: {client.id}")
+                                    else:
+                                        logger.warning(f"Case conceptualization update returned None for client ID: {client.id}")
+                                else:
+                                    logger.error(f"Could not find client for transcript ID: {transcript.id} to update conceptualization.")
+
+                            except Exception as e_concept:
+                                db.session.rollback() # Rollback client update if conceptualization failed
+                                logger.error(f"Error updating case conceptualization for client ID {transcript.client_id}: {str(e_concept)}")
+
+                        else: # if analysis_result is None or empty
                             transcript.processing_status = 'failed'
-                            logger.warning(f"AI analysis failed for: {transcript.original_filename}")
-                    else:
+                            logger.warning(f"AI analysis (detailed) failed or returned empty for: {transcript.original_filename}")
+                            db.session.commit() 
+                    else: # if no raw_content or no ai_service
                         transcript.processing_status = 'failed'
-                        logger.warning(f"No content available for: {transcript.original_filename}")
-                    
-                    db.session.commit()
+                        logger.warning(f"No content or AI service available for: {transcript.original_filename}")
+                        db.session.commit()
                     
                 except Exception as e:
+                    db.session.rollback() # Rollback any partial changes to transcript for this iteration
                     logger.error(f"Error processing transcript {transcript.id}: {str(e)}")
                     transcript.processing_status = 'failed'
                     db.session.commit()

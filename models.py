@@ -9,6 +9,10 @@ class Client(db.Model):
     notion_database_id = db.Column(String(255), unique=True)
     created_at = db.Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Case Conceptualization fields
+    current_case_conceptualization = db.Column(db.Text, nullable=True)
+    case_conceptualization_updated_at = db.Column(db.DateTime, nullable=True)
     
     # Relationship to transcripts
     transcripts = db.relationship('Transcript', backref='client', lazy=True, cascade='all, delete-orphan')
@@ -41,6 +45,12 @@ class Transcript(db.Model):
     key_themes = db.Column(JSON)  # List of themes/keywords
     therapy_insights = db.Column(JSON)  # Structured therapy-specific insights
     progress_indicators = db.Column(JSON)  # Progress tracking data
+
+    # Session details for Case Conceptualization
+    session_complaints = db.Column(db.JSON, nullable=True)    # Expected to store a list of strings
+    session_concerns = db.Column(db.JSON, nullable=True)      # Expected to store a list of strings
+    session_action_items = db.Column(db.JSON, nullable=True)  # Expected to store a list of strings
+    session_presentation_summary = db.Column(db.Text, nullable=True) # Text summary
     
     # Notion integration
     notion_page_id = db.Column(String(255))
