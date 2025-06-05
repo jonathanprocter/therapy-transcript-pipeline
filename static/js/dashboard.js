@@ -44,9 +44,24 @@ function loadSystemStats() {
         .then(data => {
             console.log('System stats loaded:', data);
             
-            // Validate response structure
-            if (data && typeof data === 'object' && data.system_stats && typeof data.system_stats === 'object') {
-                updateSystemStats(data.system_stats);
+            // Validate response structure - check for both nested and direct formats
+            if (data && typeof data === 'object') {
+                if (data.data && data.data.system_stats && typeof data.data.system_stats === 'object') {
+                    // New API format with data wrapper
+                    updateSystemStats(data.data.system_stats);
+                } else if (data.system_stats && typeof data.system_stats === 'object') {
+                    // Legacy format
+                    updateSystemStats(data.system_stats);
+                } else {
+                    console.warn('Invalid system stats data format:', data);
+                    // Use default stats
+                    updateSystemStats({
+                        total_clients: 0,
+                        total_transcripts: 0,
+                        pending_processing: 0,
+                        failed_processing: 0
+                    });
+                }
             } else {
                 console.warn('Invalid system stats data format:', data);
                 // Use default stats

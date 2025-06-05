@@ -148,7 +148,7 @@ class AnalyticsService:
             logger.error(f"Error generating theme frequency chart: {str(e)}")
             return self._create_empty_chart("Error generating chart")
     
-    def generate_progress_dashboard(self, sessions: List[Dict], longitudinal_data: Dict = None) -> Dict:
+    def generate_progress_dashboard(self, sessions: List[Dict], client_data: Dict, longitudinal_data: Dict = None) -> Dict:
         """Generate a comprehensive progress dashboard"""
         try:
             dashboard_data = {

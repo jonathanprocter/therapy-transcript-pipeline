@@ -422,3 +422,15 @@ class AIService:
         result = json.loads(response.text)
         result['analysis_provider'] = 'gemini'
         return result
+    
+    def is_openai_available(self) -> bool:
+        """Check if OpenAI client is initialized and available."""
+        return self.openai_client is not None
+    
+    def is_anthropic_available(self) -> bool:
+        """Check if Anthropic client is initialized and available."""
+        return self.anthropic_client is not None
+    
+    def is_gemini_available(self) -> bool:
+        """Check if Gemini client is initialized and available."""
+        return self.gemini_client is not None

@@ -51,6 +51,9 @@ class Transcript(db.Model):
     session_concerns = db.Column(db.JSON, nullable=True)      # Expected to store a list of strings
     session_action_items = db.Column(db.JSON, nullable=True)  # Expected to store a list of strings
     session_presentation_summary = db.Column(db.Text, nullable=True) # Text summary
+    
+    # Emotional analysis data
+    emotional_analysis = db.Column(JSON, nullable=True)
 
     # Notion integration
     notion_page_id = db.Column(String(255))

@@ -10,6 +10,10 @@ import re
 
 logger = logging.getLogger(__name__)
 
+class ServiceNotConfiguredError(Exception):
+    """Raised when a required service is not properly configured"""
+    pass
+
 class EmailSummaryService:
     def __init__(self):
         self.sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
