@@ -37,7 +37,7 @@
                             {% endif %}
                         {% endwith %}
 
-                        <form method="POST" enctype="multipart/form-data">
+                        <form method="POST" enctype="multipart/form-data" id="uploadForm">
                             <div class="mb-3">
                                 <label for="transcript" class="form-label">Select Transcript File</label>
                                 <input type="file" class="form-control" id="transcript" name="transcript" 
@@ -48,7 +48,10 @@
                             </div>
                             
                             <div class="d-grid">
-                                <button type="submit" class="btn btn-primary">Process Transcript</button>
+                                <button type="submit" class="btn btn-primary" id="uploadButton">
+                                    <i class="fas fa-upload me-1"></i>
+                                    Process Transcript
+                                </button>
                             </div>
                         </form>
 
