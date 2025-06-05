@@ -179,6 +179,12 @@
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                             {% if transcript.processing_status == 'completed' and (transcript.has_openai or transcript.has_anthropic or transcript.has_gemini) %}
+                                            <button type="button" class="btn btn-outline-info btn-sm generate-summary-btn"
+                                                    data-transcript-id="{{ transcript.id }}"
+                                                    data-transcript-filename="{{ transcript.filename | e }}"
+                                                    title="Generate Session Summary">
+                                                <i class="fas fa-clipboard-list"></i>
+                                            </button>
                                             <button type="button" class="btn btn-outline-success btn-sm"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#emailModal{{ transcript.id }}"

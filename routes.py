@@ -9,6 +9,7 @@ from services.emotional_analysis import EmotionalAnalysis
 # from services.visualization_service import VisualizationService # Removed
 from services.email_summary_service import EmailSummaryService
 from services.manual_upload_service import ManualUploadService
+from services.session_summary_service import SessionSummaryService
 from sqlalchemy import func, or_, text, literal_column
 from datetime import datetime, timezone
 import logging
@@ -46,6 +47,7 @@ try:
     # visualization_service = VisualizationService() # Removed
     email_summary_service = EmailSummaryService()
     manual_upload_service = ManualUploadService(ai_service=ai_service) # Pass ai_service
+    session_summary_service = SessionSummaryService()
 except Exception as e:
     logger.error(f"Error initializing services: {str(e)}")
     dropbox_service = None
@@ -56,6 +58,7 @@ except Exception as e:
     # visualization_service = None # Removed
     email_summary_service = None
     manual_upload_service = None
+    session_summary_service = None
 
 @app.route('/')
 def dashboard():
@@ -778,3 +781,61 @@ def search_transcripts():
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return make_error_response("An internal error occurred while searching transcripts.", error_code="INTERNAL_SERVER_ERROR", status_code=500)
+
+@app.route('/api/generate-session-summary/<int:transcript_id>', methods=['POST'])
+def generate_session_summary(transcript_id):
+    """Generate a comprehensive one-click session summary for a specific transcript"""
+    try:
+        logger.info(f"Generating session summary for transcript ID: {transcript_id}")
+        
+        # Get the transcript
+        transcript = db.session.get(Transcript, transcript_id)
+        if not transcript:
+            return make_error_response("Transcript not found", error_code="RESOURCE_NOT_FOUND", status_code=404)
+        
+        # Check if transcript has been processed
+        if transcript.processing_status != 'completed':
+            return make_error_response("Transcript has not been fully processed yet", error_code="CONDITION_NOT_MET", status_code=400)
+        
+        # Check if session summary service is available
+        if not session_summary_service:
+            return make_error_response("Session summary service not available", error_code="SERVICE_UNAVAILABLE", status_code=503)
+        
+        # Prepare transcript data for summary generation
+        transcript_data = {
+            'id': transcript.id,
+            'original_filename': transcript.original_filename,
+            'session_date': transcript.session_date.isoformat() if transcript.session_date else None,
+            'raw_content': transcript.raw_content,
+            'openai_analysis': transcript.openai_analysis,
+            'anthropic_analysis': transcript.anthropic_analysis,
+            'gemini_analysis': transcript.gemini_analysis,
+            'client_name': transcript.client.name if transcript.client else 'Unknown Client'
+        }
+        
+        # Generate the session summary
+        summary_data = session_summary_service.generate_session_summary(transcript_data)
+        
+        # Check if summary generation was successful
+        if summary_data.get('error'):
+            return make_error_response(
+                summary_data.get('message', 'Failed to generate session summary'),
+                error_code="PROCESSING_ERROR",
+                status_code=500
+            )
+        
+        logger.info(f"Session summary generated successfully for transcript ID: {transcript_id}")
+        return make_success_response(
+            data=summary_data,
+            message="Session summary generated successfully"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating session summary for transcript {transcript_id}: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return make_error_response(
+            "Failed to generate session summary",
+            error_code="INTERNAL_SERVER_ERROR",
+            status_code=500
+        )
