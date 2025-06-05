@@ -1,181 +1,115 @@
 """
-Systematic AI completion - process transcripts one at a time
+Systematic AI completion with optimized error handling and progress tracking
 """
-import os
-import sys
-import time
+
 import logging
-from datetime import datetime, timezone
-
-sys.path.append('/home/runner/workspace')
-
+import time
+import sys
 from app import app, db
-from models import Transcript, ProcessingLog
-from config import Config
+from models import Transcript
+from services.ai_service import AIService
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def process_single_anthropic():
-    """Process one transcript for Anthropic analysis"""
-    import anthropic
-    
-    anthropic_client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
-    
+def complete_single_transcript(transcript_id, provider):
+    """Complete analysis for a single transcript with specific provider"""
     with app.app_context():
-        from sqlalchemy import text
-        
-        # Get one transcript missing Anthropic analysis
-        query = text("""
-            SELECT t.id, t.original_filename, c.name as client_name, CHAR_LENGTH(t.raw_content) as content_len
-            FROM transcript t
-            JOIN client c ON t.client_id = c.id
-            WHERE t.raw_content IS NOT NULL 
-            AND CHAR_LENGTH(t.raw_content) > 100
-            AND (t.anthropic_analysis IS NULL OR CHAR_LENGTH(CAST(t.anthropic_analysis AS TEXT)) < 1000)
-            ORDER BY t.id
-            LIMIT 1
-        """)
-        
-        result = db.session.execute(query)
-        row = result.fetchone()
-        
-        if not row:
-            logger.info("No transcripts need Anthropic analysis")
-            return False
-        
-        transcript_id, filename, client_name, content_len = row
-        logger.info(f"Anthropic: {client_name} - {filename} ({content_len} chars)")
-        
-        transcript = db.session.get(Transcript, transcript_id)
-        if not transcript:
-            return False
-        
         try:
-            response = anthropic_client.messages.create(
-                model=Config.ANTHROPIC_MODEL,
-                max_tokens=4000,
-                temperature=0.3,
-                messages=[
-                    {"role": "user", "content": f"{Config.THERAPY_ANALYSIS_PROMPT}\n\n{transcript.raw_content}"}
-                ]
-            )
-            
-            analysis = response.content[0].text.strip()
-            if len(analysis) > 500:
-                transcript.anthropic_analysis = analysis
-                db.session.commit()
-                logger.info(f"✓ Complete ({len(analysis)} chars)")
-                return True
-            else:
-                logger.warning(f"Analysis too short: {len(analysis)} chars")
+            transcript = db.session.get(Transcript, transcript_id)
+            if not transcript:
                 return False
-                
-        except Exception as e:
-            logger.error(f"Failed: {str(e)[:100]}")
-            return False
-
-def process_single_gemini():
-    """Process one transcript for Gemini analysis"""
-    import google.generativeai as genai
-    
-    genai.configure(api_key=Config.GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    with app.app_context():
-        from sqlalchemy import text
-        
-        # Get one transcript missing Gemini analysis
-        query = text("""
-            SELECT t.id, t.original_filename, c.name as client_name, CHAR_LENGTH(t.raw_content) as content_len
-            FROM transcript t
-            JOIN client c ON t.client_id = c.id
-            WHERE t.raw_content IS NOT NULL 
-            AND CHAR_LENGTH(t.raw_content) > 100
-            AND (t.gemini_analysis IS NULL OR CHAR_LENGTH(CAST(t.gemini_analysis AS TEXT)) < 1000)
-            ORDER BY t.id
-            LIMIT 1
-        """)
-        
-        result = db.session.execute(query)
-        row = result.fetchone()
-        
-        if not row:
-            logger.info("No transcripts need Gemini analysis")
-            return False
-        
-        transcript_id, filename, client_name, content_len = row
-        logger.info(f"Gemini: {client_name} - {filename} ({content_len} chars)")
-        
-        transcript = db.session.get(Transcript, transcript_id)
-        if not transcript:
-            return False
-        
-        try:
-            response = gemini_model.generate_content(
-                f"{Config.THERAPY_ANALYSIS_PROMPT}\n\n{transcript.raw_content}",
-                generation_config={
-                    'max_output_tokens': 4000,
-                    'temperature': 0.3
-                }
-            )
             
-            analysis = response.text.strip()
-            if len(analysis) > 500:
-                transcript.gemini_analysis = analysis
-                db.session.commit()
-                logger.info(f"✓ Complete ({len(analysis)} chars)")
-                return True
-            else:
-                logger.warning(f"Analysis too short: {len(analysis)} chars")
-                return False
-                
+            ai_service = AIService()
+            
+            if provider == 'anthropic' and not transcript.anthropic_analysis:
+                analysis = ai_service._analyze_with_anthropic(transcript.raw_content)
+                if analysis:
+                    transcript.anthropic_analysis = analysis
+                    db.session.commit()
+                    logger.info(f"Anthropic completed: {transcript.original_filename[:40]}")
+                    return True
+                    
+            elif provider == 'gemini' and not transcript.gemini_analysis:
+                analysis = ai_service._analyze_with_gemini(transcript.raw_content)
+                if analysis:
+                    transcript.gemini_analysis = analysis
+                    db.session.commit()
+                    logger.info(f"Gemini completed: {transcript.original_filename[:40]}")
+                    return True
+                    
         except Exception as e:
-            logger.error(f"Failed: {str(e)[:100]}")
-            return False
+            logger.error(f"{provider} error for transcript {transcript_id}: {str(e)[:80]}")
+            db.session.rollback()
+            
+        return False
 
-def get_status():
-    """Get current completion status"""
+def get_incomplete_transcripts():
+    """Get transcript IDs that need analysis"""
     with app.app_context():
-        from sqlalchemy import text
+        anthropic_missing = db.session.query(Transcript.id).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.anthropic_analysis.is_(None)
+        ).limit(10).all()
         
-        query = text("""
-            SELECT 
-                COUNT(*) as total,
-                COUNT(CASE WHEN anthropic_analysis IS NOT NULL AND CHAR_LENGTH(CAST(anthropic_analysis AS TEXT)) > 1000 THEN 1 END) as anthropic_done,
-                COUNT(CASE WHEN gemini_analysis IS NOT NULL AND CHAR_LENGTH(CAST(gemini_analysis AS TEXT)) > 1000 THEN 1 END) as gemini_done
-            FROM transcript 
-            WHERE raw_content IS NOT NULL AND CHAR_LENGTH(raw_content) > 100
-        """)
+        gemini_missing = db.session.query(Transcript.id).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.gemini_analysis.is_(None)
+        ).limit(10).all()
         
-        result = db.session.execute(query)
-        row = result.fetchone()
-        
-        total, anthropic_done, gemini_done = row
-        return total, anthropic_done, gemini_done
+        return ([t.id for t in anthropic_missing], [t.id for t in gemini_missing])
 
-def main():
-    """Main processing function"""
-    logger.info("Starting systematic AI processing")
+def run_systematic_completion():
+    """Run systematic completion with progress tracking"""
+    logger.info("Starting systematic AI completion")
     
-    total, anthropic_done, gemini_done = get_status()
-    logger.info(f"Initial status: Anthropic {anthropic_done}/{total}, Gemini {gemini_done}/{total}")
+    anthropic_ids, gemini_ids = get_incomplete_transcripts()
+    total_processed = 0
     
-    # Process one Anthropic if needed
-    if anthropic_done < total:
-        success = process_single_anthropic()
-        if success:
-            time.sleep(2)
+    # Process Anthropic analyses
+    logger.info(f"Processing {len(anthropic_ids)} Anthropic analyses")
+    for i, transcript_id in enumerate(anthropic_ids, 1):
+        if complete_single_transcript(transcript_id, 'anthropic'):
+            total_processed += 1
+        time.sleep(2)  # Rate limiting
+        logger.info(f"Anthropic progress: {i}/{len(anthropic_ids)}")
+        
+        # Early exit after reasonable batch
+        if i >= 5:
+            break
     
-    # Process one Gemini if needed
-    if gemini_done < total:
-        success = process_single_gemini()
-        if success:
-            time.sleep(2)
+    # Process Gemini analyses
+    logger.info(f"Processing {len(gemini_ids)} Gemini analyses")
+    for i, transcript_id in enumerate(gemini_ids, 1):
+        if complete_single_transcript(transcript_id, 'gemini'):
+            total_processed += 1
+        time.sleep(2)  # Rate limiting
+        logger.info(f"Gemini progress: {i}/{len(gemini_ids)}")
+        
+        # Early exit after reasonable batch
+        if i >= 5:
+            break
     
-    # Final status
-    total, anthropic_done, gemini_done = get_status()
-    logger.info(f"Final status: Anthropic {anthropic_done}/{total}, Gemini {gemini_done}/{total}")
+    # Final status report
+    with app.app_context():
+        total = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed'
+        ).count()
+        
+        anthropic_done = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.anthropic_analysis.isnot(None)
+        ).count()
+        
+        gemini_done = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.gemini_analysis.isnot(None)
+        ).count()
+        
+        logger.info(f"Session completed: {total_processed} new analyses")
+        logger.info(f"Current status:")
+        logger.info(f"  Anthropic: {anthropic_done}/{total} ({anthropic_done/total*100:.1f}%)")
+        logger.info(f"  Gemini: {gemini_done}/{total} ({gemini_done/total*100:.1f}%)")
 
 if __name__ == "__main__":
-    main()
+    run_systematic_completion()
