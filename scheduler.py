@@ -133,7 +133,8 @@ class BackgroundScheduler:
                     file_type=filename.split('.')[-1].lower() if '.' in filename else 'unknown',
                     processing_status='pending',
                     raw_content='',  # Set empty string instead of None to avoid NOT NULL constraint
-                    created_at=datetime.now(timezone.utc)
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc)
                 )
                 db.session.add(transcript)
                 db.session.commit()
