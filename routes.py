@@ -107,18 +107,17 @@ def client_details(client_id):
         # Get latest session date
         latest_session = max([t.session_date for t in transcripts if t.session_date], default=None)
 
-        client_data = {
-            'id': client.id,
-            'name': client.name,
-            'notion_database_id': client.notion_database_id,
+        client_stats = {
             'total_sessions': total_sessions,
             'completed_sessions': completed_sessions,
             'pending_sessions': pending_sessions,
-            'latest_session': latest_session,
-            'transcripts': transcripts
+            'notion_connected': bool(client.notion_database_id)
         }
 
-        return render_template('client_details.html', client=client_data)
+        return render_template('client_details.html', 
+                             client=client, 
+                             transcripts=transcripts,
+                             client_stats=client_stats)
 
     except Exception as e:
         logger.error(f"Error loading client details: {str(e)}")
