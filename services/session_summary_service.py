@@ -245,17 +245,26 @@ class SessionSummaryService:
         
         for analysis in analyses:
             for pattern in overview_patterns:
-                match = re.search(pattern, analysis, re.IGNORECASE | re.DOTALL)
-                if match:
-                    # Extract the content (may be in group 1 or 2 depending on pattern)
-                    overview = match.group(2) if len(match.groups()) > 1 and match.group(2) else match.group(1)
-                    overview = overview.strip()
-                    overview = re.sub(r'\s+', ' ', overview)
-                    if len(overview) > 50:  # Ensure meaningful content
-                        # Clean up formatting
-                        overview = re.sub(r'\*+', '', overview)  # Remove asterisks
-                        overview = re.sub(r'^\W+', '', overview)  # Remove leading non-word chars
-                        return overview[:500] + "..." if len(overview) > 500 else overview
+                try:
+                    match = re.search(pattern, analysis, re.IGNORECASE | re.DOTALL)
+                    if match:
+                        # Extract the content (may be in group 1 or 2 depending on pattern)
+                        if len(match.groups()) > 1 and match.group(2):
+                            overview = match.group(2)
+                        else:
+                            overview = match.group(1)
+                        
+                        if overview:
+                            overview = overview.strip()
+                            overview = re.sub(r'\s+', ' ', overview)
+                            if len(overview) > 50:  # Ensure meaningful content
+                                # Clean up formatting
+                                overview = re.sub(r'\*+', '', overview)  # Remove asterisks
+                                overview = re.sub(r'^\W+', '', overview)  # Remove leading non-word chars
+                                return overview[:500] + "..." if len(overview) > 500 else overview
+                except Exception as e:
+                    # Skip this pattern if regex fails
+                    continue
         
         # If no structured overview found, extract key sentences
         for analysis in analyses:
