@@ -1,3 +1,4 @@
+
 <!-- Test comment -->
 {% extends "base.html" %}
 
@@ -92,7 +93,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const uploadForm = document.getElementById('uploadForm');
         const uploadButton = document.getElementById('uploadButton');
-
+        
         if (uploadForm) {
             uploadForm.addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -114,7 +115,7 @@
                 if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.show === 'function') {
                      aiLoadingIndicator.show(filename);
                 } else if (window.showLoading && typeof window.showLoading === 'function') { // Fallback to simpler global loading
-                    window.showLoading();
+                    window.showLoading(); 
                 }
                 
                 if(uploadButton) {
@@ -125,17 +126,17 @@
                 const formData = new FormData();
                 formData.append('transcript', file);
                 
-                fetch(uploadForm.action || window.location.pathname, {
+                fetch(uploadForm.action || window.location.pathname, { 
                     method: 'POST',
                     body: formData
                 })
                 .then(response => {
                     if (response.ok) {
                         simulateProcessingStages();
-                        // If server redirects, browser handles it.
+                        // If server redirects, browser handles it. 
                         // If server re-renders page with flash messages, they should appear.
                         // We might need to hide indicators if no redirect happens.
-                        if (!response.redirected) {
+                        if (!response.redirected) { 
                            if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.hide === 'function') {
                                 window.aiLoadingIndicator.hide();
                            } else if (window.hideLoading && typeof window.hideLoading === 'function') {
@@ -144,7 +145,7 @@
                         }
                         // Server is expected to redirect on success or re-render with messages on validation fail.
                         // No client-side redirect needed here.
-                        return;
+                        return; 
                     } else {
                         // Handle non-OK responses (e.g., 400, 413, 500)
                         if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.error === 'function') {
@@ -168,23 +169,23 @@
                             window.showAlert('Upload Error: ' + error.message, 'danger');
                         }
                     }
-
-                    if(uploadButton) {
+                    
+                    if(uploadButton) { 
                         uploadButton.disabled = false;
                         uploadButton.innerHTML = '<i class="fas fa-cloud-upload-alt me-2"></i>Process Transcript';
                     }
                 });
             });
         }
-
+        
         function simulateProcessingStages() {
             if (window.aiLoadingIndicator && typeof window.aiLoadingIndicator.nextStage === 'function') {
-                const DURATION_PER_STAGE = 300;
-                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 1);
-                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 2);
-                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 3);
-                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 4);
-                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 5);
+                const DURATION_PER_STAGE = 300; 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 1); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 2); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 3); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 4); 
+                setTimeout(() => aiLoadingIndicator.nextStage(), DURATION_PER_STAGE * 5); 
             }
         }
     });

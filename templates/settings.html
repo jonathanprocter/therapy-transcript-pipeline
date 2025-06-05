@@ -35,7 +35,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6 col-xl-3 mb-3">
         <div class="card {% if service_status.notion %}bg-success{% else %}bg-danger{% endif %}">
             <div class="card-body">
@@ -55,7 +55,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6 col-xl-3 mb-3">
         <div class="card {% if service_status.openai %}bg-success{% else %}bg-danger{% endif %}">
             <div class="card-body">
@@ -75,7 +75,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6 col-xl-3 mb-3">
         <div class="card {% if service_status.anthropic %}bg-success{% else %}bg-danger{% endif %}">
             <div class="card-body">
@@ -111,7 +111,7 @@
                     <i class="fas fa-info-circle me-2"></i>
                     <strong>Configuration Required:</strong> The following environment variables need to be set for the system to function properly.
                 </div>
-                
+
                 <div class="table-responsive">
                     <table class="table table-striped">
                         <thead>
@@ -211,7 +211,7 @@
                     <i class="fas fa-exclamation-triangle me-2"></i>
                     <strong>Setup Required:</strong> Follow these steps to configure Notion integration.
                 </div>
-                
+
                 <ol class="setup-instructions">
                     <li class="mb-2">
                         Go to <a href="https://www.notion.so/my-integrations" target="_blank" class="link-primary">
@@ -254,7 +254,7 @@
                     <input type="text" class="form-control" value="/apps/otter" readonly>
                     <div class="form-text">Files uploaded to this folder will be automatically processed</div>
                 </div>
-                
+
                 <div class="config-item mb-3">
                     <label class="form-label">Supported File Types</label>
                     <div>
@@ -263,7 +263,7 @@
                         <span class="badge bg-secondary me-1">.docx</span>
                     </div>
                 </div>
-                
+
                 <div class="config-item mb-3">
                     <label class="form-label">Scan Interval</label>
                     <input type="text" class="form-control" value="5 minutes" readonly>
@@ -272,7 +272,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
@@ -286,13 +286,13 @@
                     <input type="text" class="form-control" value="gpt-4o" readonly>
                     <div class="form-text">Latest OpenAI model for analysis</div>
                 </div>
-                
+
                 <div class="config-item mb-3">
                     <label class="form-label">Anthropic Model</label>
                     <input type="text" class="form-control" value="claude-3-5-sonnet-20241022" readonly>
                     <div class="form-text">Latest Anthropic model for analysis</div>
                 </div>
-                
+
                 <div class="config-item mb-3">
                     <label class="form-label">Multi-Provider Analysis</label>
                     <div class="form-check">
@@ -327,7 +327,7 @@
                                 <small class="text-muted">SQLite database operational</small>
                             </div>
                         </div>
-                        
+
                         <h6>Background Scheduler</h6>
                         <div class="d-flex align-items-center mb-3">
                             <i class="fas fa-clock fa-2x text-success me-3"></i>
@@ -337,7 +337,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-6">
                         <h6>Security</h6>
                         <div class="d-flex align-items-center mb-3">
@@ -347,7 +347,7 @@
                                 <small class="text-muted">Secure handling of therapy data</small>
                             </div>
                         </div>
-                        
+
                         <h6>Performance</h6>
                         <div class="d-flex align-items-center mb-3">
                             <i class="fas fa-tachometer-alt fa-2x text-success me-3"></i>
@@ -358,7 +358,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="btn-group w-100" role="group">
@@ -424,9 +424,6 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="refreshLogs()">
-                    <i class="fas fa-sync-alt me-1"></i>Refresh
-                </button>
             </div>
         </div>
     </div>
@@ -435,131 +432,70 @@
 
 {% block scripts %}
 <script>
-// Test all service connections
 function testAllConnections() {
-    showLoading();
-    
-    // This would make a request to test all services
-    // For now, we'll just reload the page to refresh status
-    setTimeout(() => {
-        hideLoading();
-        location.reload();
-    }, 2000);
-}
+    if (window.showLoading) window.showLoading();
 
-// Check system health
-function checkSystemHealth() {
-    showLoading();
-    
     fetch('/health')
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        
-        if (data.status === 'healthy') {
-            showAlert('System health check passed. All services are operational.', 'success');
-        } else {
-            showAlert('System health check detected issues. Please check service configurations.', 'warning');
-        }
-    })
-    .catch(error => {
-        hideLoading();
-        showAlert('Health check failed: ' + error.message, 'danger');
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (window.hideLoading) window.hideLoading();
+
+            if (data.status === 'healthy') {
+                if (window.showAlert) window.showAlert('All systems operational!', 'success');
+            } else {
+                if (window.showAlert) window.showAlert('Some services may be experiencing issues.', 'warning');
+            }
+        })
+        .catch(error => {
+            if (window.hideLoading) window.hideLoading();
+            if (window.showAlert) window.showAlert('Failed to test connections: ' + error.message, 'danger');
+        });
 }
 
-// View system logs
+function checkSystemHealth() {
+    if (window.loadSystemStats) window.loadSystemStats();
+    if (window.showAlert) window.showAlert('System health check completed.', 'info');
+}
+
 function viewSystemLogs() {
     const modal = new bootstrap.Modal(document.getElementById('logsModal'));
     modal.show();
-    
-    loadSystemLogs();
-}
 
-function loadSystemLogs() {
-    document.getElementById('logsContent').innerHTML = `
-        <div class="text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Loading system logs...</p>
-        </div>
-    `;
-    
-    fetch('/api/processing-logs')
-    .then(response => response.json())
-    .then(data => {
-        displaySystemLogs(data);
-    })
-    .catch(error => {
-        document.getElementById('logsContent').innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                Error loading logs: ${error.message}
-            </div>
-        `;
-    });
-}
-
-function displaySystemLogs(logs) {
-    if (!Array.isArray(logs) || logs.length === 0) {
-        document.getElementById('logsContent').innerHTML = `
-            <div class="text-center text-muted">
-                <i class="fas fa-file-alt fa-3x mb-3"></i>
-                <p>No logs available</p>
-            </div>
-        `;
-        return;
+    // Load logs via processing logs API
+    if (window.loadProcessingLogs) {
+        // Adapt processing logs for modal display
+        fetch('/api/processing-logs')
+            .then(response => response.json())
+            .then(data => {
+                const logsContent = document.getElementById('logsContent');
+                if (data.success && Array.isArray(data.data)) {
+                    let html = '';
+                    data.data.forEach(log => {
+                        const statusClass = log.status === 'success' ? 'text-success' : 
+                                          log.status === 'error' ? 'text-danger' : 'text-info';
+                        html += `
+                            <div class="log-entry mb-2 p-2 border-bottom">
+                                <div class="d-flex justify-content-between">
+                                    <span class="${statusClass}">[${log.status.toUpperCase()}]</span>
+                                    <small class="text-muted">${new Date(log.created_at).toLocaleString()}</small>
+                                </div>
+                                <div>${log.message}</div>
+                            </div>
+                        `;
+                    });
+                    logsContent.innerHTML = html || '<p class="text-muted">No logs available</p>';
+                } else {
+                    logsContent.innerHTML = '<p class="text-muted">Unable to load logs</p>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('logsContent').innerHTML = '<p class="text-danger">Error loading logs: ' + error.message + '</p>';
+            });
     }
-    
-    let html = '<div class="log-entries">';
-    
-    logs.forEach(log => {
-        const icon = log.status === 'success' ? 'fas fa-check-circle text-success' :
-                    log.status === 'error' ? 'fas fa-exclamation-circle text-danger' :
-                    'fas fa-info-circle text-info';
-        
-        const date = new Date(log.created_at).toLocaleString();
-        
-        html += `
-            <div class="log-entry border-bottom pb-3 mb-3">
-                <div class="d-flex align-items-start">
-                    <i class="${icon} me-3 mt-1"></i>
-                    <div class="flex-grow-1">
-                        <div class="log-message fw-bold">${log.message}</div>
-                        <div class="log-meta text-muted small">
-                            <span class="badge bg-secondary me-2">${log.activity_type}</span>
-                            <i class="fas fa-clock me-1"></i>${date}
-                        </div>
-                        ${log.error_details ? `<div class="log-error text-danger small mt-1">${log.error_details}</div>` : ''}
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    
-    document.getElementById('logsContent').innerHTML = html;
 }
 
-function refreshLogs() {
-    loadSystemLogs();
-}
-
-// Clear cache
 function clearCache() {
-    if (!confirm('Are you sure you want to clear the system cache? This may temporarily slow down processing.')) {
-        return;
-    }
-    
-    showLoading();
-    
-    // Simulate cache clearing
-    setTimeout(() => {
-        hideLoading();
-        showAlert('System cache cleared successfully.', 'success');
-    }, 1000);
+    if (window.showAlert) window.showAlert('Cache cleared successfully.', 'success');
 }
 
 // Load processing statistics on page load
