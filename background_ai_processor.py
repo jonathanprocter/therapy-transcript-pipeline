@@ -2,151 +2,107 @@
 Background AI processor that runs efficiently without timeouts
 Processes transcripts in small batches with proper error handling
 """
-import os
-import sys
-import time
+
 import logging
-from datetime import datetime, timezone
-
-sys.path.append('/home/runner/workspace')
-
+import time
 from app import app, db
-from models import Transcript, ProcessingLog
-from config import Config
+from models import Transcript
+from services.ai_service import AIService
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def process_single_batch():
     """Process a single batch of 3 transcripts"""
-    import anthropic
-    import google.generativeai as genai
-    
-    # Initialize clients
-    anthropic_client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
-    genai.configure(api_key=Config.GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-    
     with app.app_context():
-        from sqlalchemy import text
+        # Get 1 Anthropic and 1 Gemini transcript
+        anthropic_transcript = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.anthropic_analysis.is_(None)
+        ).first()
         
-        # Get 3 transcripts missing analysis
-        query = text("""
-            SELECT t.id, t.original_filename, c.name as client_name
-            FROM transcript t
-            JOIN client c ON t.client_id = c.id
-            WHERE t.raw_content IS NOT NULL 
-            AND CHAR_LENGTH(t.raw_content) > 100
-            AND (
-                (t.anthropic_analysis IS NULL OR CHAR_LENGTH(CAST(t.anthropic_analysis AS TEXT)) < 1000)
-                OR 
-                (t.gemini_analysis IS NULL OR CHAR_LENGTH(CAST(t.gemini_analysis AS TEXT)) < 1000)
-            )
-            ORDER BY t.id
-            LIMIT 3
-        """)
+        gemini_transcript = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.gemini_analysis.is_(None)
+        ).first()
         
-        result = db.session.execute(query)
-        transcripts = result.fetchall()
+        if not anthropic_transcript and not gemini_transcript:
+            return 0, "No transcripts available for processing"
         
-        if not transcripts:
-            logger.info("No transcripts need processing")
-            return 0
+        ai_service = AIService()
+        completed = 0
         
-        processed = 0
+        # Process Anthropic
+        if anthropic_transcript:
+            try:
+                logger.info(f"Processing Anthropic: {anthropic_transcript.original_filename[:40]}")
+                analysis = ai_service._analyze_with_anthropic(anthropic_transcript.raw_content)
+                if analysis:
+                    anthropic_transcript.anthropic_analysis = analysis
+                    db.session.commit()
+                    completed += 1
+                    logger.info("Anthropic completed")
+            except Exception as e:
+                logger.error(f"Anthropic error: {str(e)[:50]}")
+                db.session.rollback()
         
-        for row in transcripts:
-            transcript_id, filename, client_name = row
-            transcript = db.session.get(Transcript, transcript_id)
-            if not transcript:
-                continue
-            
-            logger.info(f"Processing: {client_name} - {filename}")
-            
-            # Anthropic Analysis
-            if not transcript.anthropic_analysis or len(str(transcript.anthropic_analysis)) < 1000:
-                try:
-                    response = anthropic_client.messages.create(
-                        model=Config.ANTHROPIC_MODEL,
-                        max_tokens=4000,
-                        temperature=0.3,
-                        messages=[
-                            {"role": "user", "content": f"{Config.THERAPY_ANALYSIS_PROMPT}\n\n{transcript.raw_content}"}
-                        ]
-                    )
-                    
-                    analysis = response.content[0].text.strip()
-                    if len(analysis) > 500:
-                        transcript.anthropic_analysis = analysis
-                        logger.info(f"  ✓ Anthropic complete")
-                        
-                except Exception as e:
-                    logger.error(f"  Anthropic failed: {str(e)[:50]}")
-                
-                time.sleep(3)
-            
-            # Gemini Analysis
-            if not transcript.gemini_analysis or len(str(transcript.gemini_analysis)) < 1000:
-                try:
-                    response = gemini_model.generate_content(
-                        f"{Config.THERAPY_ANALYSIS_PROMPT}\n\n{transcript.raw_content}",
-                        generation_config={'max_output_tokens': 4000, 'temperature': 0.3}
-                    )
-                    
-                    analysis = response.text.strip()
-                    if len(analysis) > 500:
-                        transcript.gemini_analysis = analysis
-                        logger.info(f"  ✓ Gemini complete")
-                        
-                except Exception as e:
-                    logger.error(f"  Gemini failed: {str(e)[:50]}")
-                
-                time.sleep(3)
-            
-            # Update status if complete
-            openai_complete = transcript.openai_analysis and len(str(transcript.openai_analysis)) > 1000
-            anthropic_complete = transcript.anthropic_analysis and len(str(transcript.anthropic_analysis)) > 1000
-            gemini_complete = transcript.gemini_analysis and len(str(transcript.gemini_analysis)) > 1000
-            
-            if openai_complete and anthropic_complete and gemini_complete:
-                transcript.processing_status = 'completed'
-            
-            db.session.commit()
-            processed += 1
+        time.sleep(3)  # Rate limiting
         
-        return processed
+        # Process Gemini
+        if gemini_transcript:
+            try:
+                logger.info(f"Processing Gemini: {gemini_transcript.original_filename[:40]}")
+                analysis = ai_service._analyze_with_gemini(gemini_transcript.raw_content)
+                if analysis:
+                    gemini_transcript.gemini_analysis = analysis
+                    db.session.commit()
+                    completed += 1
+                    logger.info("Gemini completed")
+            except Exception as e:
+                logger.error(f"Gemini error: {str(e)[:50]}")
+                db.session.rollback()
+        
+        # Get current status
+        total = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed'
+        ).count()
+        
+        anthropic_done = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.anthropic_analysis.isnot(None)
+        ).count()
+        
+        gemini_done = db.session.query(Transcript).filter(
+            Transcript.processing_status == 'completed',
+            Transcript.gemini_analysis.isnot(None)
+        ).count()
+        
+        status = f"Current: Anthropic {anthropic_done}/{total}, Gemini {gemini_done}/{total}"
+        return completed, status
 
 def run_background_processor():
     """Run the background processor for multiple batches"""
     logger.info("Starting background AI processor")
     
-    for batch in range(5):  # Process 5 batches
-        processed = process_single_batch()
-        if processed == 0:
-            logger.info(f"Batch {batch + 1}: No more transcripts to process")
-            break
-        else:
-            logger.info(f"Batch {batch + 1}: Processed {processed} transcripts")
-            time.sleep(10)  # Wait between batches
+    total_completed = 0
+    max_batches = 5
     
-    # Final status
-    with app.app_context():
-        from sqlalchemy import text
+    for batch_num in range(max_batches):
+        logger.info(f"Processing batch {batch_num + 1}/{max_batches}")
         
-        query = text("""
-            SELECT 
-                COUNT(*) as total,
-                COUNT(CASE WHEN anthropic_analysis IS NOT NULL AND CHAR_LENGTH(CAST(anthropic_analysis AS TEXT)) > 1000 THEN 1 END) as anthropic_done,
-                COUNT(CASE WHEN gemini_analysis IS NOT NULL AND CHAR_LENGTH(CAST(gemini_analysis AS TEXT)) > 1000 THEN 1 END) as gemini_done
-            FROM transcript 
-            WHERE raw_content IS NOT NULL AND CHAR_LENGTH(raw_content) > 100
-        """)
+        completed, status = process_single_batch()
+        total_completed += completed
         
-        result = db.session.execute(query)
-        row = result.fetchone()
-        total, anthropic_done, gemini_done = row
+        logger.info(f"Batch {batch_num + 1} completed: +{completed} analyses")
+        logger.info(status)
         
-        logger.info(f"FINAL STATUS: Anthropic {anthropic_done}/{total}, Gemini {gemini_done}/{total}")
+        if completed == 0:
+            logger.info("No more transcripts to process")
+            break
+        
+        time.sleep(5)  # Rest between batches
+    
+    logger.info(f"Background processing completed: {total_completed} total analyses processed")
 
 if __name__ == "__main__":
     run_background_processor()
