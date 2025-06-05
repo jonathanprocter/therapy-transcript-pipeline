@@ -334,7 +334,7 @@ class AnalyticsService:
         
         return metrics
     
-    def _generate_insights(self, sessions: List[Dict], longitudinal_data: Dict = None) -> List[str]:
+    def _generate_insights(self, sessions: List[Dict], longitudinal_data: Optional[Dict] = None) -> List[str]:
         """Generate textual insights based on data"""
         insights = []
         
@@ -390,8 +390,13 @@ class AnalyticsService:
         if not dates:
             return "No valid dates found"
         
-        min_date = min(dates)
-        max_date = max(dates)
+        # Filter out None values before comparison
+        valid_dates = [d for d in dates if d is not None]
+        if not valid_dates:
+            return "No valid dates found"
+            
+        min_date = min(valid_dates)
+        max_date = max(valid_dates)
         
         return f"{min_date.strftime('%m/%d/%Y')} - {max_date.strftime('%m/%d/%Y')}"
     

@@ -25,7 +25,11 @@ class AIService:
                 logger.warning("OpenAI API key not found")
                 return None
             
-            client = openai.OpenAI(api_key=api_key)
+            # Initialize without organization header to avoid mismatch
+            client = openai.OpenAI(
+                api_key=api_key,
+                organization=None  # Remove organization header
+            )
             logger.info("OpenAI client initialized successfully")
             return client
         except Exception as e:
