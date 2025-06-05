@@ -228,6 +228,22 @@ class SessionSummaryService:
         
         return str(analysis_data)
     
+    def _clean_text(self, text: str) -> str:
+        """Clean text from formatting issues and syntax errors"""
+        if not text:
+            return ""
+        
+        # Remove common syntax issues
+        cleaned = re.sub(r'\\n\\n', ' ', text)  # Remove escaped newlines
+        cleaned = re.sub(r'\\n', ' ', cleaned)  # Remove single escaped newlines
+        cleaned = re.sub(r'\\"', '"', cleaned)  # Fix escaped quotes
+        cleaned = re.sub(r'\\', '', cleaned)    # Remove remaining escapes
+        cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
+        cleaned = re.sub(r'\*+', '', cleaned)   # Remove asterisks
+        cleaned = cleaned.strip()
+        
+        return cleaned
+    
     def _generate_session_overview(self, openai: str, anthropic: str, gemini: str) -> str:
         """Generate a comprehensive session overview"""
         analyses = [a for a in [openai, anthropic, gemini] if a and a.strip()]
@@ -255,12 +271,8 @@ class SessionSummaryService:
                             overview = match.group(1)
                         
                         if overview:
-                            overview = overview.strip()
-                            overview = re.sub(r'\s+', ' ', overview)
+                            overview = self._clean_text(overview)
                             if len(overview) > 50:  # Ensure meaningful content
-                                # Clean up formatting
-                                overview = re.sub(r'\*+', '', overview)  # Remove asterisks
-                                overview = re.sub(r'^\W+', '', overview)  # Remove leading non-word chars
                                 return overview[:500] + "..." if len(overview) > 500 else overview
                 except Exception as e:
                     # Skip this pattern if regex fails
@@ -277,7 +289,7 @@ class SessionSummaryService:
                     
                     for sentence in sentences:
                         if sentence and any(keyword in sentence.lower() for keyword in keywords) and len(sentence.strip()) > 30:
-                            cleaned = re.sub(r'\s+', ' ', sentence.strip())
+                            cleaned = self._clean_text(sentence.strip())
                             if len(cleaned) > 50:
                                 clinical_sentences.append(cleaned)
                                 if len(clinical_sentences) >= 2:
@@ -320,6 +332,7 @@ class SessionSummaryService:
                 for line in insight_lines[:5]:  # Limit to 5 insights
                     # Remove numbering and clean up
                     cleaned = re.sub(r'^\d+\.?\s*', '', line).strip()
+                    cleaned = self._clean_text(cleaned)
                     if len(cleaned) > 20:
                         insights.append(cleaned)
         
