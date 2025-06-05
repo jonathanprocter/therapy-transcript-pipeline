@@ -474,10 +474,16 @@ class AnalyticsService:
         
         summary={}; 
         for metric,vals in metrics_vals.items():
-            if vals: cur=vals[-1];avg=sum(vals)/len(vals);trend='stable'
-            if len(vals)>1: first=vals[0]; 
-            if cur>first+0.1:trend='improving'; elif cur<first-0.1:trend='declining' 
-            summary[metric]={'current':round(cur,2),'average':round(avg,2),'trend':trend,'history':[round(v,2) for v in vals]}
+            if vals: 
+                cur=vals[-1]
+                avg=sum(vals)/len(vals)
+                trend='stable'
+                if len(vals)>1: 
+                    first=vals[0]
+                    if cur is not None and first is not None:
+                        if cur>first+0.1:trend='improving'
+                        elif cur<first-0.1:trend='declining'
+                summary[metric]={'current':round(cur,2) if cur is not None else 0,'average':round(avg,2) if avg is not None else 0,'trend':trend,'history':[round(v,2) if v is not None else 0 for v in vals]}
         
         return {'chart_data':{'labels':dates,'metrics':metrics_vals,'categories':list(keywords.keys()),'chart_type':'progress_radar'},
                 'metrics':summary,'sessions_analyzed':len(dates)}
