@@ -464,6 +464,61 @@ def test_dropbox():
             'details': 'Unexpected error during Dropbox test'
         }), 500
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring system status"""
+    try:
+        # Test database connection
+        db_healthy = True
+        try:
+            db.session.execute(db.text('SELECT 1'))
+            db.session.commit()
+        except Exception as e:
+            logger.warning(f"Database health check failed: {str(e)}")
+            db_healthy = False
+
+        # Test service connections
+        services_status = {}
+        
+        # Dropbox service
+        if dropbox_service:
+            services_status['dropbox'] = dropbox_service.test_connection()
+        else:
+            services_status['dropbox'] = False
+
+        # Notion service
+        if notion_service:
+            services_status['notion'] = notion_service.test_connection()
+        else:
+            services_status['notion'] = False
+
+        # AI services
+        ai_services_healthy = False
+        if ai_service:
+            ai_services_healthy = (ai_service.openai_client is not None or 
+                                 ai_service.anthropic_client is not None or 
+                                 ai_service.gemini_client is not None)
+
+        services_status['ai_services'] = ai_services_healthy
+
+        # Overall health status
+        overall_healthy = db_healthy and (services_status['dropbox'] or services_status['notion'] or ai_services_healthy)
+
+        return jsonify({
+            'status': 'healthy' if overall_healthy else 'degraded',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'database': db_healthy,
+            'services': services_status
+        }), 200 if overall_healthy else 503
+
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }), 503
+
 @app.route('/api/transcript/<int:transcript_id>/analysis')
 def get_transcript_analysis(transcript_id):
     """Get detailed analysis for a specific transcript"""
@@ -497,38 +552,6 @@ def internal_error(error):
     db.session.rollback()
     logger.error(f"Internal server error: {str(error)}")
     return render_template('500.html'), 500
-
-# Health check endpoint
-@app.route('/health')
-def health_check():
-    """Health check endpoint"""
-    try:
-        # Check database connection
-        with app.app_context():
-            db.session.execute(text('SELECT 1'))
-
-        # Check Dropbox connection
-        dropbox_status = 'disconnected'
-        try:
-            from services.dropbox_service import DropboxService
-            dropbox_service = DropboxService()
-            if dropbox_service.test_connection():
-                dropbox_status = 'connected'
-        except Exception as e:
-            logger.warning(f"Dropbox health check failed: {str(e)}")
-
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
-            'database': 'connected',
-            'dropbox': dropbox_status
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
