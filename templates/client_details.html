@@ -272,7 +272,7 @@
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                                 <i class="fas fa-times me-1"></i>Cancel
                             </button>
-                            <button type="submit" class="btn btn-success">
+                            <button type="submit" class="btn btn-success email-send-btn" data-transcript-id="{{ transcript.id }}">
                                 <i class="fas fa-paper-plane me-1"></i>Send Summary
                             </button>
                         </div>
@@ -341,4 +341,161 @@
         </div>
     </div>
 </div>
+
+<!-- Email Loading Indicator -->
+<div class="modal fade" id="emailLoadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Sending...</span>
+                </div>
+                <h5>Sending Email Summary</h5>
+                <p class="text-muted mb-0" id="emailProgress">Preparing comprehensive session summary...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Email form handling with loading indicators
+    const emailForms = document.querySelectorAll('form[action*="send_email_summary"]');
+    const emailLoadingModal = new bootstrap.Modal(document.getElementById('emailLoadingModal'));
+    const emailProgress = document.getElementById('emailProgress');
+    
+    emailForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const button = form.querySelector('.email-send-btn');
+            const transcriptId = button.dataset.transcriptId;
+            const recipientEmail = form.querySelector('input[name="recipient_email"]').value;
+            
+            if (!recipientEmail) {
+                alert('Please enter a recipient email address.');
+                return;
+            }
+            
+            // Hide the email modal
+            const modalId = `emailModal${transcriptId}`;
+            const emailModal = bootstrap.Modal.getInstance(document.getElementById(modalId));
+            emailModal.hide();
+            
+            // Show loading modal
+            emailLoadingModal.show();
+            
+            // Simulate email processing stages
+            setTimeout(() => {
+                emailProgress.textContent = 'Generating session overview...';
+            }, 500);
+            
+            setTimeout(() => {
+                emailProgress.textContent = 'Formatting therapeutic insights...';
+            }, 1500);
+            
+            setTimeout(() => {
+                emailProgress.textContent = 'Preparing action items and follow-up questions...';
+            }, 2500);
+            
+            setTimeout(() => {
+                emailProgress.textContent = 'Sending via secure email service...';
+            }, 3500);
+            
+            // Submit the form
+            const formData = new FormData(form);
+            
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                } else {
+                    throw new Error('Email sending failed');
+                }
+            })
+            .then(html => {
+                emailLoadingModal.hide();
+                
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.innerHTML = `
+                    <i class="fas fa-check-circle me-2"></i>
+                    Email summary sent successfully to ${recipientEmail}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                const container = document.querySelector('.container').firstElementChild;
+                container.insertBefore(alertDiv, container.firstElementChild);
+                
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 5000);
+            })
+            .catch(error => {
+                emailLoadingModal.hide();
+                
+                // Show error message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                alertDiv.innerHTML = `
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Failed to send email: ${error.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                const container = document.querySelector('.container').firstElementChild;
+                container.insertBefore(alertDiv, container.firstElementChild);
+            });
+        });
+    });
+    
+    // AI Processing indicators for reprocessing
+    const reprocessButtons = document.querySelectorAll('a[href*="reprocess_transcript"]');
+    reprocessButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const transcriptId = this.href.split('/').pop();
+            
+            // Show AI loading indicator for reprocessing
+            if (typeof aiLoadingIndicator !== 'undefined') {
+                aiLoadingIndicator.show('Reprocessing transcript...');
+                
+                // Simulate reprocessing stages
+                setTimeout(() => aiLoadingIndicator.nextStage(), 1000);  // Extract
+                setTimeout(() => aiLoadingIndicator.nextStage(), 3000);  // OpenAI
+                setTimeout(() => aiLoadingIndicator.nextStage(), 8000);  // Anthropic
+                setTimeout(() => aiLoadingIndicator.nextStage(), 13000); // Gemini
+                setTimeout(() => aiLoadingIndicator.nextStage(), 16000); // Notion
+                
+                // Navigate to reprocess URL
+                fetch(this.href, { method: 'POST' })
+                .then(response => {
+                    if (response.ok) {
+                        aiLoadingIndicator.complete();
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    } else {
+                        aiLoadingIndicator.error('openai', 'Reprocessing failed');
+                    }
+                })
+                .catch(error => {
+                    aiLoadingIndicator.error('upload', error.message);
+                });
+            } else {
+                // Fallback if loading indicator not available
+                window.location.href = this.href;
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
