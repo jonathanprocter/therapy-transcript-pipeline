@@ -198,42 +198,42 @@ def process_new_files():
     try:
         with app.app_context():
             logger.info("Starting background processing of new files")
-            
+
             # Get files that are pending processing
             pending_transcripts = db.session.query(Transcript).filter_by(
                 processing_status='pending'
             ).limit(5).all()
-            
+
             if not pending_transcripts:
                 logger.info("No pending transcripts to process")
                 return
-            
+
             from services.ai_service import AIService
             from services.document_processor import DocumentProcessor
             from services.dropbox_service import DropboxService
-            
+
             # Initialize services
             ai_service = AIService()
             doc_processor = DocumentProcessor()
             dropbox_service = DropboxService()
-            
+
             for transcript in pending_transcripts:
                 try:
                     logger.info(f"Processing transcript: {transcript.original_filename}")
-                    
+
                     # Download file content if needed
                     if not transcript.raw_content and transcript.dropbox_path:
                         file_content = dropbox_service.download_file(transcript.dropbox_path)
                         if file_content:
                             doc_result = doc_processor.process_document(file_content, transcript.original_filename)
                             transcript.raw_content = doc_result.get('cleaned_content', '')
-                    
+
                     # Process with AI if we have content
                     if transcript.raw_content and ai_service:
                         # Use the new detailed analysis method
                         client_name_for_analysis = transcript.client.name if transcript.client else "Unknown Client"
                         analysis_result = ai_service.analyze_transcript_detailed(transcript.raw_content, client_name_for_analysis)
-                        
+
                         if analysis_result:
                             # Assuming analyze_transcript_detailed returns a flat dict with all fields
                             # Existing fields (adapt if structure from analyze_transcript_detailed is different)
@@ -251,7 +251,7 @@ def process_new_files():
                             transcript.session_concerns = analysis_result.get('session_concerns', [])
                             transcript.session_action_items = analysis_result.get('session_action_items', [])
                             transcript.session_presentation_summary = analysis_result.get('session_presentation_summary')
-                            
+
                             transcript.processing_status = 'completed'
                             transcript.processed_at = datetime.now(timezone.utc)
                             db.session.commit() # Commit transcript updates first
@@ -265,7 +265,7 @@ def process_new_files():
 
                                 if client:
                                     existing_conceptualization = client.current_case_conceptualization
-                                    
+
                                     # Prepare current session data for conceptualization prompt
                                     # This dict should match what _format_session_for_conceptualization_prompt expects
                                     current_session_analysis_dict = {
@@ -277,7 +277,7 @@ def process_new_files():
                                         'therapy_insights': transcript.therapy_insights, # This is the summary string
                                         'session_action_items': transcript.session_action_items
                                     }
-                                    
+
                                     logger.info(f"Updating case conceptualization for client ID: {client.id} based on transcript ID: {transcript.id}")
                                     updated_conceptualization_text = ai_service.update_case_conceptualization(
                                         existing_conceptualization, 
@@ -306,15 +306,15 @@ def process_new_files():
                         transcript.processing_status = 'failed'
                         logger.warning(f"No content or AI service available for: {transcript.original_filename}")
                         db.session.commit()
-                    
+
                 except Exception as e:
                     db.session.rollback() # Rollback any partial changes to transcript for this iteration
                     logger.error(f"Error processing transcript {transcript.id}: {str(e)}")
                     transcript.processing_status = 'failed'
                     db.session.commit()
-                    
+
             logger.info("Background processing completed")
-            
+
     except Exception as e:
         logger.error(f"Error in background processing: {str(e)}")
 
@@ -345,3 +345,36 @@ def stop_background_scheduler():
             scheduler.stop()
     except Exception as e:
         logger.error(f"Error stopping background scheduler: {str(e)}")
+
+def process_document_content(file_content, filename):
+    """Process document content based on file type"""
+    try:
+        file_ext = os.path.splitext(filename)[1].lower()
+
+        if file_ext == '.pdf':
+            from services.document_processor import DocumentProcessor
+            processor = DocumentProcessor()
+            content = processor.extract_text_from_pdf(file_content)
+            return content if content else f"[PDF content extraction failed for {filename}]"
+        elif file_ext == '.txt':
+            try:
+                content = file_content.decode('utf-8')
+                return content if content.strip() else f"[Empty text file: {filename}]"
+            except UnicodeDecodeError:
+                try:
+                    content = file_content.decode('latin-1')
+                    return content if content.strip() else f"[Empty text file: {filename}]"
+                except:
+                    return f"[Text file encoding error for {filename}]"
+        elif file_ext == '.docx':
+            from services.document_processor import DocumentProcessor
+            processor = DocumentProcessor()
+            content = processor.extract_text_from_docx(file_content)
+            return content if content else f"[DOCX content extraction failed for {filename}]"
+        else:
+            logger.warning(f"Unsupported file type: {file_ext}")
+            return f"[Unsupported file type {file_ext} for {filename}]"
+
+    except Exception as e:
+        logger.error(f"Error processing document content for {filename}: {str(e)}")
+        return f"[Document processing error for {filename}: {str(e)}]"

@@ -133,10 +133,18 @@ class DropboxService:
 
     def download_file(self, file_path: str) -> Optional[bytes]:
         """Download a file from Dropbox"""
+        if not self.client:
+            logger.error("Dropbox client not initialized")
+            return None
+            
         try:
             _, response = self.client.files_download(file_path)
-            logger.info(f"Downloaded file: {file_path} ({len(response.content)} bytes)")
-            return response.content
+            if response.content:
+                logger.info(f"Downloaded file: {file_path} ({len(response.content)} bytes)")
+                return response.content
+            else:
+                logger.warning(f"Downloaded file {file_path} has no content")
+                return b""
         except dropbox.exceptions.ApiError as e:
             logger.error(f"Dropbox API error while downloading {file_path}: {str(e)}")
             return None
