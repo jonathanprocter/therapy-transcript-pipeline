@@ -318,3 +318,23 @@ class DropboxService:
         except Exception as e:
             logger.error(f"Unexpected error creating backup folder: {str(e)}")
             return False
+
+    # --- Encapsulation/Getter Methods ---
+    def get_monitor_folder(self) -> str:
+        """Returns the configured Dropbox monitor folder path."""
+        return self.monitor_folder
+
+    def get_user_account_display_name(self) -> Optional[str]:
+        """
+        Retrieves the display name of the authenticated Dropbox user.
+        Returns None if the client is not initialized or if the API call fails.
+        """
+        if not self.client:
+            logger.warning("Dropbox client not initialized. Cannot get user account name.")
+            return None
+        try:
+            account = self.client.users_get_current_account()
+            return account.name.display_name
+        except Exception as e:
+            logger.error(f"Could not get Dropbox account name via API: {str(e)}")
+            return None
