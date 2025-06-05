@@ -6,12 +6,12 @@ Test the complete AI processing pipeline with all three providers
 import os
 import sys
 
-# Set all API keys
-os.environ['OPENAI_API_KEY'] = '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'
-os.environ['ANTHROPIC_API_KEY'] = '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'
-os.environ['GEMINI_API_KEY'] = 'AIzaSyDKSugqYPsqYMrrAiXh-1bAPf992gVrGbk'
-os.environ['NOTION_INTEGRATION_SECRET'] = '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'
-os.environ['NOTION_DATABASE_ID'] = '2049f30def818033b42af330a18aa313'
+# Use placeholder API keys for testing
+os.environ.setdefault('OPENAI_API_KEY', 'dummy')
+os.environ.setdefault('ANTHROPIC_API_KEY', 'dummy')
+os.environ.setdefault('GEMINI_API_KEY', 'dummy')
+os.environ.setdefault('NOTION_INTEGRATION_SECRET', 'dummy')
+os.environ.setdefault('NOTION_DATABASE_ID', 'dummy')
 
 def test_all_ai_providers():
     """Test all three AI providers with therapy transcript analysis"""
