@@ -887,6 +887,250 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Session Summary Generation
+    const generateSummaryButtons = document.querySelectorAll('.generate-summary-btn');
+    generateSummaryButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const transcriptId = this.dataset.transcriptId;
+            const transcriptFilename = this.dataset.transcriptFilename;
+            
+            // Show the session summary modal
+            const sessionSummaryModal = new bootstrap.Modal(document.getElementById('sessionSummaryModal'));
+            sessionSummaryModal.show();
+            
+            // Update modal title
+            document.getElementById('sessionSummaryModalLabel').textContent = `Session Summary: ${transcriptFilename}`;
+            
+            // Show loading state
+            const modalBody = document.getElementById('sessionSummaryModalBody');
+            modalBody.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5>Generating Session Summary</h5>
+                    <p class="text-muted">Analyzing transcript and extracting key insights...</p>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 50%"></div>
+                    </div>
+                </div>
+            `;
+            
+            // Make API call to generate summary
+            fetch(`/api/generate-session-summary/${transcriptId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    renderSessionSummary(data.data);
+                } else {
+                    showSummaryError(data.error?.message || 'Failed to generate session summary');
+                }
+            })
+            .catch(error => {
+                showSummaryError('Network error occurred while generating summary');
+            });
+        });
+    });
+
+    function renderSessionSummary(summaryData) {
+        const modalBody = document.getElementById('sessionSummaryModalBody');
+        
+        let html = '<div class="session-summary-content">';
+        
+        // Session Overview
+        if (summaryData.session_overview) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-file-alt me-2"></i>Session Overview</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>${summaryData.session_overview}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Key Insights
+        if (summaryData.key_insights && summaryData.key_insights.length > 0) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Key Insights</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            ${summaryData.key_insights.map(insight => `<li class="list-group-item">${insight}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Therapeutic Progress
+        if (summaryData.therapeutic_progress) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Therapeutic Progress</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Overall Progress:</strong> 
+                                <span class="badge bg-primary">${summaryData.therapeutic_progress.overall_progress || 'Moderate'}</span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Goal Achievement:</strong> 
+                                <span class="badge bg-info">${summaryData.therapeutic_progress.goal_achievement || 'In Progress'}</span>
+                            </div>
+                        </div>
+                        ${summaryData.therapeutic_progress.specific_improvements && summaryData.therapeutic_progress.specific_improvements.length > 0 ? `
+                            <div class="mt-3">
+                                <strong>Improvements:</strong>
+                                <ul class="list-unstyled mt-2">
+                                    ${summaryData.therapeutic_progress.specific_improvements.map(improvement => `<li><i class="fas fa-check text-success me-2"></i>${improvement}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Session Goals
+        if (summaryData.session_goals && summaryData.session_goals.length > 0) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0"><i class="fas fa-target me-2"></i>Session Goals</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            ${summaryData.session_goals.map(goal => `<li class="list-group-item">${goal}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Interventions Used
+        if (summaryData.interventions_used && summaryData.interventions_used.length > 0) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0"><i class="fas fa-tools me-2"></i>Interventions Used</h6>
+                    </div>
+                    <div class="card-body">
+                        ${summaryData.interventions_used.map(intervention => `<span class="badge bg-secondary me-2 mb-2">${intervention}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Risk Assessment
+        if (summaryData.risk_assessment) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-danger text-white">
+                        <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Risk Assessment</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Suicide Risk:</strong> <span class="badge ${summaryData.risk_assessment.suicide_risk === 'Low' ? 'bg-success' : 'bg-danger'}">${summaryData.risk_assessment.suicide_risk}</span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Self-Harm Risk:</strong> <span class="badge ${summaryData.risk_assessment.self_harm_risk === 'Low' ? 'bg-success' : 'bg-warning'}">${summaryData.risk_assessment.self_harm_risk}</span>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <strong>Substance Use:</strong> ${summaryData.risk_assessment.substance_use}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Session Rating
+        if (summaryData.session_rating) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-dark text-white">
+                        <h6 class="mb-0"><i class="fas fa-star me-2"></i>Session Effectiveness</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <strong>Rating:</strong>
+                            <div class="ms-2">
+                                ${Array.from({length: 10}, (_, i) => `<i class="fas fa-star ${i < summaryData.session_rating.overall_rating ? 'text-warning' : 'text-muted'}"></i>`).join('')}
+                                <span class="ms-2">${summaryData.session_rating.overall_rating}/10</span>
+                            </div>
+                        </div>
+                        <p class="mb-0">${summaryData.session_rating.rating_rationale}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Next Session Focus
+        if (summaryData.next_session_focus && summaryData.next_session_focus.length > 0) {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-arrow-right me-2"></i>Next Session Focus</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            ${summaryData.next_session_focus.map(focus => `<li class="list-group-item">${focus}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        modalBody.innerHTML = html;
+    }
+    
+    function showSummaryError(message) {
+        const modalBody = document.getElementById('sessionSummaryModalBody');
+        modalBody.innerHTML = `
+            <div class="alert alert-danger">
+                <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+                <p>${message}</p>
+            </div>
+        `;
+    }
 });
 </script>
+
+<!-- Session Summary Modal -->
+<div class="modal fade" id="sessionSummaryModal" tabindex="-1" aria-labelledby="sessionSummaryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sessionSummaryModalLabel">Session Summary</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="sessionSummaryModalBody">
+                <!-- Content will be dynamically loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print me-2"></i>Print Summary
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
