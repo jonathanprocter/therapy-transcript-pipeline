@@ -6,7 +6,7 @@ from services.ai_service import AIService
 from services.notion_service import NotionService
 from services.analytics_service import AnalyticsService
 from services.emotional_analysis import EmotionalAnalysis
-from services.visualization_service import VisualizationService
+# VisualizationService has been removed - using AnalyticsService instead
 from services.email_summary_service import EmailSummaryService
 from datetime import datetime, timezone
 import logging
@@ -21,8 +21,10 @@ try:
     notion_service = NotionService()
     analytics_service = AnalyticsService()
     emotional_analyzer = EmotionalAnalysis()
-    visualization_service = VisualizationService()
     email_summary_service = EmailSummaryService()
+    # Import ManualUploadService
+    from services.manual_upload_service import ManualUploadService
+    manual_upload_service = ManualUploadService(ai_service=ai_service)
 except Exception as e:
     logger.error(f"Error initializing services: {str(e)}")
     dropbox_service = None
@@ -30,8 +32,8 @@ except Exception as e:
     notion_service = None
     analytics_service = None
     emotional_analyzer = None
-    visualization_service = None
     email_summary_service = None
+    manual_upload_service = None
 
 @app.route('/')
 def dashboard():
@@ -508,101 +510,37 @@ def health_check():
             'dropbox': dropbox_service is not None,
             'ai_service': ai_service is not None,
             'notion': notion_service is not None,
-            'analytics': analytics_service is not None
+            'analytics': analytics_service is not None,
+            'manual_upload': manual_upload_service is not None
         }
     })
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
-    """Upload and process therapy transcript files manually"""
-    import tempfile
-    import os
-    from werkzeug.utils import secure_filename
-
-    # Import the uploaded processing pipeline
-    try:
-        from src.processing_pipeline import ProcessingPipeline
-    except ImportError:
-        flash('Processing pipeline not available', 'error')
-        return render_template('upload.html')
-
+    """Upload and process therapy transcript files manually using ManualUploadService."""
     if request.method == 'POST':
+        if not manual_upload_service: 
+            flash('File upload service is currently unavailable. Please try again later.', 'error')
+            return render_template('upload.html') 
+        
         if 'transcript' not in request.files:
-            flash('No file selected', 'error')
-            return redirect(request.url)
-
+            flash('No file part selected.', 'error')
+            return render_template('upload.html') 
+        
         file = request.files['transcript']
-        if file.filename == '':
-            flash('No file selected', 'error')
-            return redirect(request.url)
-
-        # Check file type
-        allowed_extensions = {'pdf', 'txt', 'docx'}
-        if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
-            flash('Invalid file type. Please upload PDF, TXT, or DOCX files.', 'error')
-            return redirect(request.url)
-
-        try:
-            # Save file temporarily
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp:
-                file_path = temp.name
-                file.save(file_path)
-
-            filename = secure_filename(file.filename)
-            logger.info(f"Processing uploaded file: {filename}")
-
-            # Initialize processing pipeline with API keys
-            api_keys = {
-                'dropbox_token': os.environ.get('DROPBOX_ACCESS_TOKEN'),
-                'openai_key': os.environ.get('OPENAI_API_KEY'),
-                'claude_key': os.environ.get('ANTHROPIC_API_KEY'),
-                'gemini_key': os.environ.get('GEMINI_API_KEY'),
-                'notion_key': os.environ.get('NOTION_INTEGRATION_SECRET'),
-                'notion_parent_id': os.environ.get('NOTION_DATABASE_ID'),
-                'dropbox_folder': '/apps/otter'
-            }
-
-            pipeline = ProcessingPipeline(api_keys)
-            result = pipeline.process_single_file(file_path)
-
-            # Clean up temp file
-            try:
-                os.unlink(file_path)
-            except Exception as e:
-                logger.error(f"Error removing temp file: {str(e)}")
-
-            if result.get("success", False):
-                # Create client record if it doesn't exist
-                client_name = result.get("client_name", "Unknown")
-                client = Client.query.filter_by(name=client_name).first()
-                if not client:
-                    client = Client(name=client_name)
-                    db.session.add(client)
-                    db.session.commit()
-
-                # Create transcript record
-                transcript = Transcript(
-                    client_id=client.id,
-                    original_filename=filename,
-                    dropbox_path=f"manual_upload/{filename}",
-                    file_type=filename.rsplit('.', 1)[1].lower(),
-                    raw_content=result.get("content", ""),
-                    processing_status='completed',
-                    processed_at=datetime.now(timezone.utc),
-                    notion_synced=result.get("notion_url") is not None
-                )
-                db.session.add(transcript)
-                db.session.commit()
-
-                flash(f'Successfully processed transcript for {client_name}!', 'success')
-                return redirect(url_for('dashboard'))
-            else:
-                flash(f'Error processing file: {result.get("error", "Unknown error")}', 'error')
-
-        except Exception as e:
-            logger.error(f"Error processing upload: {str(e)}")
-            flash(f'Error processing file: {str(e)}', 'error')
-
+        if not file or not file.filename: 
+            flash('No file selected or file has no name.', 'error')
+            return render_template('upload.html')
+        
+        result = manual_upload_service.handle_file_upload(file)
+        
+        if result.get('success'):
+            flash(result.get('message', 'File processed successfully!'), 'success')
+            return redirect(url_for('dashboard')) 
+        else:
+            flash(result.get('error', 'An unknown error occurred during file processing.'), 'error')
+            return render_template('upload.html') 
+    
     return render_template('upload.html')
 
 @app.route('/client/<int:client_id>/visualization')
@@ -643,12 +581,16 @@ def client_visualization(client_id):
                 }
             })
 
-        # Generate visualization dashboard
-        if visualization_service:
+        # Generate visualization dashboard using analytics service
+        if analytics_service:
             client_data = {'name': client.name, 'id': client.id}
-            dashboard_data = visualization_service.generate_longitudinal_dashboard(client_data, session_data)
+            dashboard_data = analytics_service.generate_progress_dashboard(
+                sessions=session_data,
+                client_data=client_data,
+                longitudinal_data=longitudinal_emotions
+            )
         else:
-            dashboard_data = {'error': 'Visualization service unavailable'}
+            dashboard_data = {'error': 'Analytics service unavailable'}
 
         # Generate longitudinal emotional analysis
         if emotional_analyzer:
