@@ -1,36 +1,42 @@
-import os
+from typing import List, Optional
 
-class Config:
-    """Configuration class for the therapy transcript processor"""
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
+
+
+class Settings(BaseSettings):
+    """Structured settings loaded from environment variables."""
+    model_config = SettingsConfigDict(extra="allow")
 
     # Dropbox configuration
-    DROPBOX_ACCESS_TOKEN = os.environ.get('DROPBOX_ACCESS_TOKEN')
-    DROPBOX_MONITOR_FOLDER = os.environ.get('DROPBOX_MONITOR_FOLDER', '/apps/otter')  # Monitor Otter app folder with PDFs
+    DROPBOX_ACCESS_TOKEN: Optional[str] = Field(None, env="DROPBOX_ACCESS_TOKEN")
+    DROPBOX_MONITOR_FOLDER: str = Field("/apps/otter", env="DROPBOX_MONITOR_FOLDER")
 
     # AI Provider API Keys
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY') 
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+    OPENAI_API_KEY: Optional[str] = Field(None, env="OPENAI_API_KEY")
+    ANTHROPIC_API_KEY: Optional[str] = Field(None, env="ANTHROPIC_API_KEY")
+    GEMINI_API_KEY: Optional[str] = Field(None, env="GEMINI_API_KEY")
 
     # Notion configuration
-    NOTION_INTEGRATION_SECRET = os.environ.get('NOTION_INTEGRATION_SECRET')
-    NOTION_DATABASE_ID = os.environ.get('NOTION_DATABASE_ID')
-    NOTION_PARENT_PAGE_ID = '2049f30def818033b42af330a18aa313'  # Parent page for client databases
+    NOTION_INTEGRATION_SECRET: Optional[str] = Field(None, env="NOTION_INTEGRATION_SECRET")
+    NOTION_DATABASE_ID: Optional[str] = Field(None, env="NOTION_DATABASE_ID")
+    NOTION_PARENT_PAGE_ID: str = "2049f30def818033b42af330a18aa313"  # Parent page for client databases
 
     # Processing configuration
-    SUPPORTED_FILE_TYPES = ['.pdf', '.txt', '.docx']
-    MAX_FILE_SIZE_MB = 50
+    SUPPORTED_FILE_TYPES: List[str] = [".pdf", ".txt", ".docx"]
+    MAX_FILE_SIZE_MB: int = 50
 
     # Scheduler configuration
-    DROPBOX_SCAN_INTERVAL_MINUTES = 5
+    DROPBOX_SCAN_INTERVAL_MINUTES: int = 5
 
     # AI Model configurations
-    OPENAI_MODEL = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-    ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"  # the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
-    GEMINI_MODEL = "gemini-1.5-flash"
+    OPENAI_MODEL: str = "gpt-4o"  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"  # the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
+    GEMINI_MODEL: str = "gemini-1.5-flash"
 
-    # Analysis prompts
-    THERAPY_ANALYSIS_PROMPT = """
+
+# Analysis prompts stored as module-level constants
+THERAPY_ANALYSIS_PROMPT = """
     You are a highly skilled and experienced therapist specializing in creating comprehensive and insightful clinical progress notes. Your task is to analyze the provided counseling session transcript and generate a detailed progress note with the depth, detail, and clinical sophistication of an expert human therapist.
 
     CRITICAL FORMATTING REQUIREMENT: Use NO markdown syntax whatsoever. No hashtags, asterisks for bold/italic, or any markdown formatting. Use plain text only with proper headings and structure but no markdown characters.
@@ -76,7 +82,7 @@ class Config:
     Transcript:
     """
 
-    LONGITUDINAL_ANALYSIS_PROMPT = """
+LONGITUDINAL_ANALYSIS_PROMPT = """
     You are an expert clinical therapist specializing in longitudinal case conceptualization and treatment planning. Your task is to create a comprehensive, dynamic case conceptualization that evolves with each new therapy session.
 
     Based on the client's complete therapy history provided below, create a detailed longitudinal case conceptualization with the following structure:
@@ -132,26 +138,27 @@ class Config:
     """
 
 # Environment validation
-def validate_environment():
-    """Validate that required environment variables are set"""
+def validate_environment(settings: Settings) -> bool:
+    """Validate that required environment variables are set."""
     required_vars = [
-        'DROPBOX_ACCESS_TOKEN',
-        'OPENAI_API_KEY', 
-        'ANTHROPIC_API_KEY',
-        'GEMINI_API_KEY',
-        'NOTION_INTEGRATION_SECRET'
+        "DROPBOX_ACCESS_TOKEN",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "NOTION_INTEGRATION_SECRET",
     ]
 
-    missing_vars = []
-    for var in required_vars:
-        if not os.environ.get(var):
-            missing_vars.append(var)
-
-    if missing_vars:
-        print(f"Warning: Missing environment variables: {', '.join(missing_vars)}")
+    missing = [var for var in required_vars if getattr(settings, var) is None]
+    if missing:
+        print(f"Warning: Missing environment variables: {', '.join(missing)}")
         print("The application may not function properly without these variables.")
 
-    return len(missing_vars) == 0
+    return len(missing) == 0
 
-# Call validation on import
-validate_environment()
+# Instantiate the settings and perform validation on import
+Config = Settings()
+validate_environment(Config)
+
+# Expose prompt constants as attributes on the Config object for backward compatibility
+Config.THERAPY_ANALYSIS_PROMPT = THERAPY_ANALYSIS_PROMPT
+Config.LONGITUDINAL_ANALYSIS_PROMPT = LONGITUDINAL_ANALYSIS_PROMPT

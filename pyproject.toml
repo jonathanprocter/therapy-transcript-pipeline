@@ -21,6 +21,7 @@ dependencies = [
     "pypdf2>=3.0.1",
     "python-docx>=1.1.2",
     "python-dotenv>=1.1.0",
+    "pydantic-settings>=2.2.1",
     "requests>=2.32.3",
     "sendgrid>=6.12.3",
     "sqlalchemy>=2.0.41",
