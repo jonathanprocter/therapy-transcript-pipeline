@@ -327,62 +327,15 @@ def reprocess_transcript(transcript_id):
         db.session.rollback()
         return make_error_response(f"Failed to reprocess transcript: {str(e)}", error_code="INTERNAL_SERVER_ERROR", status_code=500)
 
-@app.route('/api/create-client', methods=['POST'])
-def create_client():
-    """Create a new client"""
-    try:
-        data = request.get_json()
-        if not data:
-            return make_error_response("Request body must be valid JSON.", error_code="INVALID_REQUEST", status_code=400)
-        
-        client_name = data.get('name', '').strip()
-        if not client_name:
-            return make_error_response("Client name is required.", error_code="VALIDATION_ERROR", details={"name": ["Client name is required."]}, status_code=400)
+# This endpoint has been moved to the API blueprint in blueprints/api.py
+# @app.route('/api/create-client', methods=['POST'])
+# def create_client():
+#     ...
 
-        existing_client = db.session.query(Client).filter(Client.name.ilike(client_name)).first() 
-        if existing_client:
-            return make_error_response("Client with this name already exists.", error_code="DUPLICATE_RESOURCE", status_code=409)
-
-        client = Client(name=client_name)
-        db.session.add(client)
-        db.session.flush()
-        notion_db_id = None
-        if notion_service:
-            try:
-                notion_db_id = notion_service.create_client_database(client_name)
-                if notion_db_id: client.notion_database_id = notion_db_id
-            except Exception as e:
-                logger.warning(f"Failed to create Notion database for {client_name}: {str(e)}")
-        db.session.commit()
-        return make_success_response(
-            message=f'Client {client_name} created successfully', 
-            data={'client_id': client.id, 'notion_database_id': notion_db_id},
-            status_code=201
-        )
-    except Exception as e:
-        logger.error(f"Error creating client: {str(e)}")
-        db.session.rollback()
-        return make_error_response(str(e), error_code="INTERNAL_SERVER_ERROR", status_code=500)
-
-@app.route('/api/processing-logs')
-def get_processing_logs():
-    """Get recent processing logs"""
-    try:
-        logs = db.session.query(ProcessingLog).order_by(ProcessingLog.created_at.desc()).limit(50).all()
-        log_data = [{
-            'id': log.id,
-            'activity_type': log.activity_type or 'unknown',
-            'status': log.status or 'info',
-            'message': log.message or 'No message',
-            'created_at': log.created_at.isoformat() if log.created_at else datetime.now(timezone.utc).isoformat(),
-            'transcript_id': log.transcript_id
-        } for log in logs]
-        return make_success_response(data=log_data)
-    except Exception as e:
-        logger.error(f"Critical error getting processing logs: {str(e)}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-        return make_error_response("Critical error getting processing logs.", error_code="INTERNAL_SERVER_ERROR", status_code=500)
+# This endpoint has been moved to the API blueprint in blueprints/api.py
+# @app.route('/api/processing-logs')
+# def get_processing_logs():
+#     ...
 
 @app.route('/api/scan-dropbox', methods=['POST'])
 def scan_dropbox():

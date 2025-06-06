@@ -38,3 +38,11 @@ pytest -q
 ```
 
 Tests mock external services and do not require real API credentials.
+
+## REST API
+
+Two simple endpoints are provided via an API blueprint. Set `API_KEY` in your
+environment and include the same value in the `X-API-KEY` request header.
+
+- `POST /api/clients` – create a new client. Body schema: `{ "name": "Client Name" }`.
+- `GET /api/processing-logs` – retrieve recent processing log entries.

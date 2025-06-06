@@ -38,3 +38,6 @@ with app.app_context():
 
 # Import routes
 import routes  # noqa: F401
+
+from blueprints import api_bp
+app.register_blueprint(api_bp)
