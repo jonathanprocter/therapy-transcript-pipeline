@@ -242,18 +242,90 @@ def manual_scan():
 
 @app.route('/api/reprocess-transcript/<int:transcript_id>', methods=['POST'])
 def reprocess_transcript(transcript_id):
-    """Reprocess a specific transcript"""
+    """Reprocess a specific transcript with comprehensive AI analysis and progress notes"""
     try:
         transcript = db.session.get(Transcript, transcript_id)
         if not transcript:
             return make_error_response("Transcript not found", error_code="RESOURCE_NOT_FOUND", status_code=404)
-        transcript.processing_status = 'pending'
+        
+        # Get client information
+        client_name = transcript.client.name if transcript.client else "Unknown Client"
+        
+        # Clear existing analysis and notes
+        transcript.openai_analysis = None
+        transcript.anthropic_analysis = None
+        transcript.gemini_analysis = None
+        transcript.session_presentation_summary = None
+        transcript.processing_status = 'processing'
+        
+        # Perform comprehensive AI analysis using your clinical prompts
+        from services.clinical_ai_service import ClinicalAIService
+        clinical_ai_service = ClinicalAIService()
+        
+        # Run OpenAI analysis
+        openai_result = clinical_ai_service.analyze_with_openai(transcript.raw_content, client_name)
+        if not openai_result.get('error'):
+            transcript.openai_analysis = openai_result
+        
+        # Run Anthropic analysis
+        anthropic_result = clinical_ai_service.analyze_with_anthropic(transcript.raw_content, client_name)
+        if not anthropic_result.get('error'):
+            transcript.anthropic_analysis = anthropic_result
+        
+        # Run Gemini analysis
+        gemini_result = clinical_ai_service.analyze_with_gemini(transcript.raw_content, client_name)
+        if not gemini_result.get('error'):
+            transcript.gemini_analysis = gemini_result
+        
+        # Generate comprehensive clinical progress note
+        from services.enhanced_session_summary_fixed import EnhancedSessionSummaryService
+        summary_service = EnhancedSessionSummaryService()
+        
+        transcript_data = {
+            'id': transcript.id,
+            'client_name': client_name,
+            'original_filename': transcript.original_filename,
+            'session_date': transcript.session_date.isoformat() if transcript.session_date else None,
+            'raw_content': transcript.raw_content,
+            'openai_analysis': transcript.openai_analysis,
+            'anthropic_analysis': transcript.anthropic_analysis,
+            'gemini_analysis': transcript.gemini_analysis
+        }
+        
+        summary_result = summary_service.generate_session_summary(transcript_data)
+        if summary_result.get('summary_content'):
+            transcript.session_presentation_summary = summary_result['summary_content']
+        
+        # Update processing status
+        transcript.processing_status = 'completed'
+        transcript.processed_at = datetime.now()
+        
+        # Extract themes and update analytics fields
+        themes = clinical_ai_service.extract_themes_from_analysis(openai_result)
+        if themes:
+            transcript.key_themes = themes
+        
+        # Calculate sentiment score
+        sentiment_score = clinical_ai_service.calculate_sentiment_score(openai_result)
+        transcript.sentiment_score = sentiment_score
+        
         db.session.commit()
-        return make_success_response(message="Transcript marked for reprocessing")
+        
+        return make_success_response(
+            message=f"Transcript reprocessed successfully with comprehensive AI analysis and clinical progress note",
+            data={
+                "transcript_id": transcript_id,
+                "has_openai": bool(transcript.openai_analysis),
+                "has_anthropic": bool(transcript.anthropic_analysis), 
+                "has_gemini": bool(transcript.gemini_analysis),
+                "has_progress_note": bool(transcript.session_presentation_summary)
+            }
+        )
+        
     except Exception as e:
-        logger.error(f"Error marking transcript {transcript_id} for reprocessing: {str(e)}")
+        logger.error(f"Error reprocessing transcript {transcript_id}: {str(e)}")
         db.session.rollback()
-        return make_error_response(str(e), error_code="INTERNAL_SERVER_ERROR", status_code=500)
+        return make_error_response(f"Failed to reprocess transcript: {str(e)}", error_code="INTERNAL_SERVER_ERROR", status_code=500)
 
 @app.route('/api/create-client', methods=['POST'])
 def create_client():
