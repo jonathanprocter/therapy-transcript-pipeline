@@ -856,9 +856,9 @@ def search_transcripts():
 
 @app.route('/api/generate-session-summary/<int:transcript_id>', methods=['POST'])
 def generate_session_summary(transcript_id):
-    """Generate a comprehensive one-click session summary for a specific transcript"""
+    """Display the comprehensive clinical progress note for a specific transcript"""
     try:
-        logger.info(f"Generating session summary for transcript ID: {transcript_id}")
+        logger.info(f"Retrieving clinical progress note for transcript ID: {transcript_id}")
         
         # Get the transcript
         transcript = db.session.get(Transcript, transcript_id)
@@ -869,45 +869,40 @@ def generate_session_summary(transcript_id):
         if transcript.processing_status != 'completed':
             return make_error_response("Transcript has not been fully processed yet", error_code="CONDITION_NOT_MET", status_code=400)
         
-        # Check if session summary service is available
-        if not session_summary_service:
-            return make_error_response("Session summary service not available", error_code="SERVICE_UNAVAILABLE", status_code=503)
-        
-        # Prepare transcript data for summary generation
-        transcript_data = {
-            'id': transcript.id,
-            'original_filename': transcript.original_filename,
-            'session_date': transcript.session_date.isoformat() if transcript.session_date else None,
-            'raw_content': transcript.raw_content,
-            'openai_analysis': transcript.openai_analysis,
-            'anthropic_analysis': transcript.anthropic_analysis,
-            'gemini_analysis': transcript.gemini_analysis,
-            'client_name': transcript.client.name if transcript.client else 'Unknown Client'
-        }
-        
-        # Generate the session summary
-        summary_data = session_summary_service.generate_session_summary(transcript_data)
-        
-        # Check if summary generation was successful
-        if summary_data.get('error'):
+        # Return existing comprehensive clinical progress note
+        if transcript.session_presentation_summary:
+            # Format the stored progress note for display
+            progress_note_content = transcript.session_presentation_summary
+            
+            # Parse the content to extract key sections
+            summary_data = {
+                'session_overview': progress_note_content,
+                'raw_content': progress_note_content,
+                'client_name': transcript.client.name if transcript.client else 'Unknown Client',
+                'session_date': transcript.session_date.strftime('%B %d, %Y') if transcript.session_date else 'Unknown Date',
+                'filename': transcript.original_filename,
+                'has_content': True
+            }
+            
+            logger.info(f"Clinical progress note retrieved successfully for transcript ID: {transcript_id}")
+            return make_success_response(
+                data=summary_data,
+                message="Clinical progress note retrieved successfully"
+            )
+        else:
+            # If no stored progress note, offer to generate one
             return make_error_response(
-                summary_data.get('message', 'Failed to generate session summary'),
-                error_code="PROCESSING_ERROR",
-                status_code=500
+                "No clinical progress note found. Please use the reprocess button to generate comprehensive clinical documentation.",
+                error_code="CONTENT_NOT_FOUND",
+                status_code=404
             )
         
-        logger.info(f"Session summary generated successfully for transcript ID: {transcript_id}")
-        return make_success_response(
-            data=summary_data,
-            message="Session summary generated successfully"
-        )
-        
     except Exception as e:
-        logger.error(f"Error generating session summary for transcript {transcript_id}: {str(e)}")
+        logger.error(f"Error retrieving clinical progress note for transcript {transcript_id}: {str(e)}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return make_error_response(
-            "Failed to generate session summary",
+            "Failed to retrieve clinical progress note",
             error_code="INTERNAL_SERVER_ERROR",
             status_code=500
         )

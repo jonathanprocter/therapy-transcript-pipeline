@@ -944,15 +944,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let html = '<div class="session-summary-content">';
         
-        // Session Overview
+        // Display Clinical Progress Note
         if (summaryData.session_overview) {
+            // Format the progress note content with proper line breaks and styling
+            const formattedContent = summaryData.session_overview
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>')
+                .replace(/SUBJECTIVE:/g, '<strong>SUBJECTIVE:</strong>')
+                .replace(/OBJECTIVE:/g, '<strong>OBJECTIVE:</strong>')
+                .replace(/ASSESSMENT:/g, '<strong>ASSESSMENT:</strong>')
+                .replace(/PLAN:/g, '<strong>PLAN:</strong>')
+                .replace(/Bridge Questions for Next Session:/g, '<strong>Bridge Questions for Next Session:</strong>')
+                .replace(/Key Points Covered:/g, '<strong>Key Points Covered:</strong>')
+                .replace(/Significant Client Statements:/g, '<strong>Significant Client Statements:</strong>')
+                .replace(/Therapeutic Framework Applied:/g, '<strong>Therapeutic Framework Applied:</strong>')
+                .replace(/Session Summary:/g, '<strong>Session Summary:</strong>');
+            
             html += `
                 <div class="card mb-3">
                     <div class="card-header bg-primary text-white">
-                        <h6 class="mb-0"><i class="fas fa-file-alt me-2"></i>Session Overview</h6>
+                        <h6 class="mb-0"><i class="fas fa-file-medical me-2"></i>Comprehensive Clinical Progress Note</h6>
                     </div>
                     <div class="card-body">
-                        <p>${summaryData.session_overview}</p>
+                        <div class="clinical-note-content" style="line-height: 1.6; font-size: 14px;">
+                            <p>${formattedContent}</p>
+                        </div>
                     </div>
                 </div>
             `;
