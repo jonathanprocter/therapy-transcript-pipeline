@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
+import asyncio
 import openai
 import anthropic
 import google.generativeai as genai
@@ -106,7 +107,40 @@ class AIService:
         
         # Consolidate insights from all providers
         analysis_results['consolidated_insights'] = self._consolidate_insights(analysis_results)
-        
+
+        return analysis_results
+
+    async def analyze_transcript_async(self, transcript_content: str, client_name: str = None) -> Dict:
+        """Asynchronously analyze a transcript using all available AI providers."""
+        analysis_results = {
+            'openai_analysis': None,
+            'anthropic_analysis': None,
+            'gemini_analysis': None,
+            'consolidated_insights': None,
+            'processing_errors': []
+        }
+
+        async def run(method, key):
+            try:
+                result = await asyncio.to_thread(method, transcript_content, client_name)
+                analysis_results[key] = result
+            except Exception as e:
+                msg = f"{key.replace('_analysis','').capitalize()} analysis failed: {e}"
+                logger.error(msg)
+                analysis_results['processing_errors'].append(msg)
+
+        tasks = []
+        if self.openai_client:
+            tasks.append(run(self._analyze_with_openai, 'openai_analysis'))
+        if self.anthropic_client:
+            tasks.append(run(self._analyze_with_anthropic, 'anthropic_analysis'))
+        if self.gemini_client:
+            tasks.append(run(self._analyze_with_gemini, 'gemini_analysis'))
+
+        if tasks:
+            await asyncio.gather(*tasks)
+
+        analysis_results['consolidated_insights'] = self._consolidate_insights(analysis_results)
         return analysis_results
     
     def _analyze_with_openai(self, transcript_content: str, client_name: str = None) -> Dict:
@@ -513,7 +547,11 @@ class AIService:
                 "If no specific complaints are identified, return an empty list under the \"complaints\" key.\n\n"
                 f"Transcript:\n{transcript_text}\n\nJSON Output:"
             )
-            raw_complaints_json_str = self._call_openai_llm(complaints_prompt, response_format="json_object", model=Config.OPENAI_JSON_ extracción_MODEL or "gpt-3.5-turbo-0125")
+            raw_complaints_json_str = self._call_openai_llm(
+                complaints_prompt,
+                response_format="json_object",
+                model=Config.OPENAI_JSON_EXTRACTION_MODEL or "gpt-3.5-turbo-0125",
+            )
             if raw_complaints_json_str:
                 try:
                     complaints_data = json.loads(raw_complaints_json_str)
