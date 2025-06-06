@@ -1114,6 +1114,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         html += '</div>';
         modalBody.innerHTML = html;
+        
+        // Debug logging
+        console.log('Summary data received:', summaryData);
+        console.log('Generated HTML:', html);
     }
     
     function showSummaryError(message) {
